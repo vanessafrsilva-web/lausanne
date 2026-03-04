@@ -11,7 +11,7 @@ ZONES = {
 }
 
 st.set_page_config(page_title="Planning Lausanne Pro", layout="wide")
-st.title("📍 Planning : Unité Logement (Terrain 08h-15h)")
+st.title("📍 Planning : Unité Logement (Individuel)")
 
 # --- BARRE LATÉRALE ---
 st.sidebar.header("⚙️ Configuration")
@@ -41,63 +41,64 @@ if uploaded_file and agents_actifs:
         df['H_Tri'] = df['Heure'].astype(str).str.lower().str.strip().replace('libre', '00:00')
         df = df.sort_values(by=['Date_Obj', 'Zone_Affiche', 'H_Tri'])
         
-        # 3. Attribution
+        # 3. Attribution (Répartition par Zone)
         df['GID'] = df['Date_F'] + "_" + df['Zone_Affiche']
         grps = df['GID'].unique()
         map_agt = {g: agents_actifs[i % len(agents_actifs)] for i, g in enumerate(grps)}
         df['Agent_Attribue'] = df['GID'].map(map_agt)
 
-        # 4. Logique Horaires (Terrain dès 08:00 | Fin départ 15:00)
+        # 4. Logique Horaires INDIVIDUELLE
         suggestions = []
-        fin_agt = {} 
-        derniere_zone_agt = {} 
-
+        # On trie impérativement par DATE puis par AGENT pour ne pas mélanger les plannings
         df = df.sort_values(by=['Date_Obj', 'Agent_Attribue', 'H_Tri'])
 
+        # Dictionnaires pour suivre chaque agent séparément
+        fin_par_agent = {} 
+        zone_par_agent = {} 
+
         for i, row in df.iterrows():
-            key = f"{row['Date_F']}_{row['Agent_Attribue']}"
+            agent = row['Agent_Attribue']
+            jour = row['Date_F']
+            cle_unique = f"{jour}_{agent}" # Exemple: "22/04/2026_Celine"
+            
             h_in = str(row['Heure']).lower().strip()
             zone_actuelle = row['Zone_Affiche']
-            
-            # Mission (1h) + Battement local (15 min)
             duree_mission = timedelta(hours=1, minutes=15)
 
-            # INITIALISATION : Premier RDV de la journée à 08h00
-            if key not in fin_agt:
-                fin_agt[key] = datetime.strptime("08:00", "%H:%M")
-                derniere_zone_agt[key] = zone_actuelle
+            # Initialisation spécifique à cet agent pour ce jour précis
+            if cle_unique not in fin_par_agent:
+                fin_par_agent[cle_unique] = datetime.strptime("08:00", "%H:%M")
+                zone_par_agent[cle_agent] = zone_actuelle if 'cle_agent' in locals() else zone_actuelle
+                zone_par_agent[cle_unique] = zone_actuelle
 
-            # TRAJET : +30 min si on change de zone (ex: Lausanne -> Oron)
-            if zone_actuelle != derniere_zone_agt[key]:
-                fin_agt[key] += timedelta(minutes=30)
+            # Trajet : +30 min SI l'agent change de zone par rapport à sa mission précédente
+            if zone_actuelle != zone_par_agent[cle_unique]:
+                fin_par_agent[cle_unique] += timedelta(minutes=30)
             
-            derniere_zone_agt[key] = zone_actuelle
+            zone_par_agent[cle_unique] = zone_actuelle
 
             if h_in != 'libre' and h_in != '':
-                # HEURE FIXE (Demandée par locataire)
+                # HEURE FIXE
                 try:
                     h_dt = datetime.strptime(h_in[:5].replace('h', ':'), "%H:%M")
-                    # CONFLIT : Si l'heure fixe arrive avant la fin du trajet/RDV précédent
-                    if h_dt < fin_agt[key] and fin_agt[key] > datetime.strptime("08:00", "%H:%M"):
+                    # CONFLIT uniquement si CET agent est déjà occupé
+                    if h_dt < fin_par_agent[cle_unique] and fin_par_agent[cle_unique] > datetime.strptime("08:00", "%H:%M"):
                         suggestions.append(f"❌ CONFLIT: {h_dt.strftime('%H:%M')}")
                     else:
                         suggestions.append(h_dt.strftime('%H:%M'))
-                    fin_agt[key] = h_dt + duree_mission
+                    fin_par_agent[cle_unique] = h_dt + duree_mission
                 except: suggestions.append(h_in)
             else:
                 # HEURE LIBRE (Suggestion terrain dès 08h00)
-                h_s = fin_agt[key]
-                
-                # Pause midi 12h-13h
+                h_s = fin_par_agent[cle_unique]
                 if h_s + duree_mission > datetime.strptime("12:00", "%H:%M") and h_s < datetime.strptime("13:00", "%H:%M"):
                     h_s = datetime.strptime("13:00", "%H:%M")
                 
-                # Alerte si départ après 15h00
                 if h_s > datetime.strptime("15:00", "%H:%M"):
                     suggestions.append("⚠️ Trop tard (Après 15h)")
                 else:
                     suggestions.append(f"Suggéré: {h_s.strftime('%H:%M')}")
-                    fin_agt[key] = h_s + duree_mission
+                    fin_par_agent[cle_unique] = h_s + duree_mission
 
         df['Heure_Finale'] = suggestions
 
