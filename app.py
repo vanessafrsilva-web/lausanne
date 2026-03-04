@@ -11,7 +11,7 @@ ZONES = {
 }
 
 st.set_page_config(page_title="Planning Lausanne Pro", layout="wide")
-st.title("📍 Planning : Unité Logement (Version 08:00 - 15:00)")
+st.title("📍 Planning : Unité Logement (Correction Finale)")
 
 # --- BARRE LATÉRALE ---
 st.sidebar.header("⚙️ Configuration")
@@ -28,7 +28,6 @@ uploaded_file = st.file_uploader("Glissez votre fichier Excel ici", type=['csv',
 
 if uploaded_file and agents_actifs:
     try:
-        # Lecture
         df = pd.read_csv(uploaded_file) if uploaded_file.name.endswith('.csv') else pd.read_excel(uploaded_file, engine='openpyxl')
         df = df.dropna(how='all').fillna('')
         df.columns = df.columns.str.strip()
@@ -42,49 +41,49 @@ if uploaded_file and agents_actifs:
         df['H_Tri'] = df['Heure'].astype(str).str.lower().str.strip().replace('libre', '00:00')
         df = df.sort_values(by=['Date_Obj', 'Zone_Affiche', 'H_Tri'])
         
-        # 3. Attribution des agents
+        # 3. Attribution (Répartition par Zone)
         df['GID'] = df['Date_F'] + "_" + df['Zone_Affiche']
         grps = df['GID'].unique()
         map_agt = {g: agents_actifs[i % len(agents_actifs)] for i, g in enumerate(grps)}
         df['Agent_Attribue'] = df['GID'].map(map_agt)
 
-        # 4. Logique de Calcul (Correction Syntaxique)
+        # 4. Logique de Calcul INDIVIDUELLE (Correction Maria Claret vs Elisabeth)
         df = df.sort_values(by=['Date_Obj', 'Agent_Attribue', 'H_Tri'])
         suggestions = []
         fin_par_cle = {} 
         zone_par_cle = {} 
 
         for i, row in df.iterrows():
-            agent = row['Agent_Attribue']
+            agent_nom_complet = row['Agent_Attribue'] # On utilise le nom complet pour différencier les Maria
             jour = row['Date_F']
-            cle = f"{jour}_{agent}" 
+            cle_unique = f"{jour}_{agent_nom_complet}" 
             
             h_in = str(row['Heure']).lower().strip()
             zone_actuelle = row['Zone_Affiche']
             duree_rdv = timedelta(hours=1, minutes=15)
 
-            if cle not in fin_par_cle:
-                fin_par_cle[cle] = datetime.strptime("08:00", "%H:%M")
-                zone_par_cle[cle] = zone_actuelle
+            if cle_unique not in fin_par_cle:
+                fin_par_cle[cle_unique] = datetime.strptime("08:00", "%H:%M")
+                zone_par_cle[cle_unique] = zone_actuelle
 
-            if zone_actuelle != zone_par_cle[cle]:
-                fin_par_cle[cle] += timedelta(minutes=30)
+            if zone_actuelle != zone_par_cle[cle_unique]:
+                fin_par_cle[cle_unique] += timedelta(minutes=30)
             
-            zone_par_cle[cle] = zone_actuelle
+            zone_par_cle[cle_unique] = zone_actuelle
 
             if h_in != 'libre' and h_in != '':
                 try:
                     h_dt = datetime.strptime(h_in[:5].replace('h', ':'), "%H:%M")
-                    if h_dt < fin_par_cle[cle] and fin_par_cle[cle] > datetime.strptime("08:00", "%H:%M"):
+                    # On vérifie si l'agent PRÉCIS est occupé
+                    if h_dt < fin_par_cle[cle_unique] and fin_par_cle[cle_unique] > datetime.strptime("08:00", "%H:%M"):
                         suggestions.append(f"❌ CONFLIT: {h_dt.strftime('%H:%M')}")
                     else:
                         suggestions.append(h_dt.strftime('%H:%M'))
-                    fin_par_cle[cle] = h_dt + duree_rdv
+                    fin_par_cle[cle_unique] = h_dt + duree_rdv
                 except:
                     suggestions.append(h_in)
             else:
-                h_s = fin_par_cle[cle]
-                # PAUSE MIDI (Correction de la ligne qui buggait)
+                h_s = fin_par_cle[cle_unique]
                 if h_s + duree_rdv > datetime.strptime("12:00", "%H:%M") and h_s < datetime.strptime("13:00", "%H:%M"):
                     h_s = datetime.strptime("13:00", "%H:%M")
                 
@@ -92,11 +91,11 @@ if uploaded_file and agents_actifs:
                     suggestions.append("⚠️ Trop tard")
                 else:
                     suggestions.append(f"Suggéré: {h_s.strftime('%H:%M')}")
-                    fin_par_cle[cle] = h_s + duree_rdv
+                    fin_par_cle[cle_unique] = h_s + duree_rdv
 
         df['Heure_Finale'] = suggestions
 
-        # 5. Affichage
+        # 5. Affichage final
         dates = ["Toutes les dates"] + sorted(df['Date_F'].unique().tolist())
         sel_date = st.sidebar.selectbox("Choisir un jour :", dates)
         
@@ -116,5 +115,3 @@ if uploaded_file and agents_actifs:
 
     except Exception as e:
         st.error(f"Erreur technique : {e}")
-elif not agents_actifs:
-    st.warning("Veuillez sélectionner au moins un agent à gauche.")
