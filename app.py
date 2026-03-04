@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 
-# Zones de proximité Lausanne
+# Configuration des Zones Lausanne
 ZONES = {
     'Bethusy A': 'Chailly', 'Bethusy B': 'Chailly',
     'Montolieu A': 'Montolieu', 'Montolieu B': 'Montolieu',
@@ -16,7 +16,7 @@ st.title("📍 Planning : Maria Claret, Celine, Maria Elisabeth")
 uploaded_file = st.file_uploader("Glissez votre fichier Excel ici", type=['csv', 'xlsx'])
 
 if uploaded_file:
-    # Lecture robuste
+    # Lecture flexible
     try:
         if uploaded_file.name.endswith('.csv'):
             df = pd.read_csv(uploaded_file)
@@ -26,47 +26,53 @@ if uploaded_file:
         # Nettoyage des colonnes (ex: 'Date ' -> 'Date')
         df.columns = df.columns.str.strip()
 
-        # 1. Préparation et Tri
+        # 1. Attribution des zones et agents
         df['Zone'] = df['Batiment'].map(ZONES)
-        # On force le tri pour que les "libre" arrivent après les heures fixes
-        df['Heure_Tri'] = df['Heure'].astype(str).str.lower().replace('libre', '23:59:00')
-        df = df.sort_values(by=['Date', 'Heure_Tri'])
         
-        # 2. Attribution des agents
+        # On trie pour que les "libre" arrivent après les heures fixes
+        df['Heure_Tri'] = df['Heure'].astype(str).str.lower().str.strip().replace('libre', '23:59:00')
+        df = df.sort_values(by=['Date', 'Zone', 'Heure_Tri'])
+        
+        # Attribution tournante des agents
         agents_noms = ['Maria Claret', 'Celine', 'Maria Elisabeth']
         df['Agent_Attribue'] = [agents_noms[i % len(agents_noms)] for i in range(len(df))]
 
-        # 3. Calcul des suggestions d'horaires
+        # 2. Logique de suggestion d'horaire
         suggestions = []
         for i, row in df.iterrows():
-            h_val = str(row['Heure']).lower().strip()
+            h_brute = str(row['Heure']).lower().strip()
             
-            if 'libre' in h_val:
-                # Cherche une mission FIXE du même agent le même jour
+            if 'libre' in h_brute:
+                # Cherche une mission FIXE du MÊME agent le MÊME jour dans le tableau trié
                 jour = row['Date']
                 agent = row['Agent_Attribue']
-                fixes = df[(df['Date'] == jour) & (df['Agent_Attribue'] == agent) & (~df['Heure'].astype(str).str.lower().contains('libre', na=False))]
+                missions_fixe = df[(df['Date'] == jour) & 
+                                   (df['Agent_Attribue'] == agent) & 
+                                   (~df['Heure'].astype(str).str.lower().str.contains('libre'))]
                 
-                if not fixes.empty:
+                if not missions_fixe.empty:
                     try:
-                        derniere_h = pd.to_datetime(str(fixes.iloc[0]['Heure']), errors='coerce')
-                        sugg = (derniere_h + timedelta(hours=1, minutes=30)).strftime('%H:%M')
+                        # On prend la première heure fixe du jour pour cet agent
+                        premiere_h = str(missions_fixe.iloc[0]['Heure'])
+                        h_dt = pd.to_datetime(premiere_h, errors='coerce')
+                        # On suggère 1h30 après
+                        sugg = (h_dt + timedelta(hours=1, minutes=30)).strftime('%H:%M')
                         suggestions.append(f"Suggéré: {sugg}")
                     except:
                         suggestions.append("09:00 (Libre)")
                 else:
                     suggestions.append("09:00 (Libre)")
             else:
-                # Formatage de l'heure fixe (ex: 15:00:00 -> 15:00)
+                # On nettoie l'affichage de l'heure fixe (ex: 09:00:00 -> 09:00)
                 try:
-                    suggestions.append(pd.to_datetime(h_val).strftime('%H:%M'))
+                    suggestions.append(pd.to_datetime(h_brute).strftime('%H:%M'))
                 except:
-                    suggestions.append(h_val)
+                    suggestions.append(h_brute)
 
         df['Heure_Finale'] = suggestions
 
-        # 4. Affichage
-        st.success("✅ Planning Maria & Celine généré !")
+        # 3. Affichage final
+        st.success("✅ Planning optimisé généré !")
         vue = df[['ID', 'Batiment', 'Date', 'Heure_Finale', 'Type', 'Agent_Attribue']]
         st.dataframe(vue.rename(columns={'Heure_Finale': 'Heure / Suggestion'}), use_container_width=True)
         
@@ -75,4 +81,4 @@ if uploaded_file:
         st.download_button("📥 Télécharger le planning final", csv, "planning_equipe.csv", "text/csv")
 
     except Exception as e:
-        st.error(f"Erreur lors de l'analyse : {e}")
+        st.error(f"Erreur lors de l'analyse du fichier : {e}")
