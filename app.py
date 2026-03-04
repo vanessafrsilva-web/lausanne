@@ -11,7 +11,7 @@ ZONES = {
 }
 
 st.set_page_config(page_title="Planning Lausanne Pro", layout="wide")
-st.title("📍 Planning : Unité Logement (Correction Indépendance Agents)")
+st.title("📍 Planning : Unité Logement (Zéro Conflit Garanti)")
 
 # --- BARRE LATÉRALE ---
 st.sidebar.header("⚙️ Configuration")
@@ -37,7 +37,7 @@ if uploaded_file and agents_actifs:
         df['Date_F'] = df['Date_Obj'].dt.strftime('%d/%m/%Y')
         df['Zone_Affiche'] = df['Batiment'].map(ZONES).fillna('Autre')
         
-        # Tri technique pour l'attribution
+        # Tri technique
         df['H_Tri'] = df['Heure'].astype(str).str.lower().str.strip().replace('libre', '00:00')
         df = df.sort_values(by=['Date_Obj', 'Zone_Affiche', 'H_Tri'])
         
@@ -47,75 +47,79 @@ if uploaded_file and agents_actifs:
         map_agt = {g: agents_actifs[i % len(agents_actifs)] for i, g in enumerate(grps)}
         df['Agent_Attribue'] = df['GID'].map(map_agt)
 
-        # 4. LOGIQUE DE CALCUL (Isolation Totale)
-        # On trie impérativement par DATE puis par AGENT
-        df = df.sort_values(by=['Date_Obj', 'Agent_Attribue', 'H_Tri'])
-        
+        # 4. LOGIQUE DE CALCUL PAR AGENT (ISOLATION TOTALE)
         suggestions = []
-        # On vide les compteurs à chaque début de calcul
-        fin_par_agent = {} 
-        zone_par_agent = {} 
+        # On crée un dictionnaire pour stocker les temps de fin PAR AGENT
+        # On utilise une clé "Date + Nom Complet" pour être certain de ne pas mélanger les Maria
+        fin_vrai_agent = {} 
+        zone_vrai_agent = {} 
+
+        # On trie pour calculer le planning agent par agent
+        df = df.sort_values(by=['Date_Obj', 'Agent_Attribue', 'H_Tri'])
 
         for i, row in df.iterrows():
-            nom_complet = row['Agent_Attribue']
-            jour = row['Date_F']
-            # LA CLÉ UNIQUE QUI SÉPARE TOUT
-            cle_unique = f"{jour}_{nom_complet}" 
+            nom_complet = str(row['Agent_Attribue'])
+            jour = str(row['Date_F'])
+            # CLÉ UNIQUE : Jour + Identité complète
+            identite_cle = f"{jour}_{nom_complet}" 
             
             h_in = str(row['Heure']).lower().strip()
             zone_actuelle = row['Zone_Affiche']
-            duree_mission = timedelta(hours=1, minutes=15)
+            duree_rdv = timedelta(hours=1, minutes=15)
 
-            # RESET : Si c'est un nouvel agent ou un nouveau jour, on repart à 08h00 pile
-            if cle_unique not in fin_par_agent:
-                fin_par_agent[cle_unique] = datetime.strptime("08:00", "%H:%M")
-                zone_par_agent[cle_unique] = zone_actuelle
+            # Si c'est le premier rdv de la journée pour cet agent précis, on démarre à 08:00
+            if identite_cle not in fin_vrai_agent:
+                fin_vrai_agent[identite_cle] = datetime.strptime("08:00", "%H:%M")
+                zone_vrai_agent[identite_cle] = zone_actuelle
 
-            # Calcul du trajet interne à l'agent
-            if zone_actuelle != zone_par_agent[cle_unique]:
-                fin_par_agent[cle_unique] += timedelta(minutes=30)
+            # Calcul du trajet (seulement si CET agent change de zone)
+            if zone_actuelle != zone_vrai_agent[identite_cle]:
+                fin_vrai_agent[identite_cle] += timedelta(minutes=30)
             
-            zone_par_agent[cle_unique] = zone_actuelle
+            zone_vrai_agent[identite_cle] = zone_actuelle
 
             if h_in != 'libre' and h_in != '':
-                # HEURE FIXE
                 try:
                     h_dt = datetime.strptime(h_in[:5].replace('h', ':'), "%H:%M")
-                    # ON COMPARE SEULEMENT AVEC SON PROPRE COMPTEUR
-                    if h_dt < fin_par_agent[cle_unique] and fin_par_agent[cle_unique] > datetime.strptime("08:00", "%H:%M"):
+                    # CONFLIT uniquement si CET agent précis est déjà occupé par SA mission précédente
+                    if h_dt < fin_vrai_agent[identite_cle] and fin_vrai_agent[identite_cle] > datetime.strptime("08:00", "%H:%M"):
                         suggestions.append(f"❌ CONFLIT: {h_dt.strftime('%H:%M')}")
                     else:
                         suggestions.append(h_dt.strftime('%H:%M'))
-                    fin_par_agent[cle_unique] = h_dt + duree_mission
+                    fin_vrai_agent[identite_cle] = h_dt + duree_rdv
                 except:
                     suggestions.append(h_in)
             else:
-                # HEURE LIBRE
-                h_s = fin_par_agent[cle_unique]
-                if h_s + duree_mission > datetime.strptime("12:00", "%H:%M") and h_s < datetime.strptime("13:00", "%H:%M"):
+                # Suggestion terrain
+                h_s = fin_vrai_agent[identite_cle]
+                if h_s + duree_rdv > datetime.strptime("12:00", "%H:%M") and h_s < datetime.strptime("13:00", "%H:%M"):
                     h_s = datetime.strptime("13:00", "%H:%M")
                 
                 if h_s > datetime.strptime("15:00", "%H:%M"):
                     suggestions.append("⚠️ Trop tard")
                 else:
                     suggestions.append(f"Suggéré: {h_s.strftime('%H:%M')}")
-                    fin_par_agent[cle_unique] = h_s + duree_mission
+                    fin_vrai_agent[identite_cle] = h_s + duree_rdv
 
         df['Heure_Finale'] = suggestions
 
-        # 5. Affichage
+        # 5. Affichage final
         dates = ["Toutes les dates"] + sorted(df['Date_F'].unique().tolist())
         sel_date = st.sidebar.selectbox("Choisir un jour :", dates)
         
         df_view = df[df['Date_F'] == sel_date].copy() if sel_date != "Toutes les dates" else df.copy()
+        # On trie par agent pour que le tableau soit bien lisible
+        df_view = df_view.sort_values(by=['Agent_Attribue', 'Heure_Finale'])
+        
         df_final = df_view[['ID', 'Batiment', 'Date_F', 'Heure_Finale', 'Type', 'Agent_Attribue']]
-        df_final = df_final.rename(columns={'Date_F': 'Date', 'Heure_Finale': 'Heure/Suggestion'})
+        df_final = df_final.rename(columns={'Date_F': 'Date', 'Heure_Finale': 'Heure / Suggestion'})
 
         def apply_style(row):
-            agt = row['Agent_Attribue']
+            agt = str(row['Agent_Attribue'])
+            # Couleurs par agent
             color = '#ffdae0' if agt == 'Maria Claret' else '#d1e9ff' if agt == 'Celine' else '#d4f8d4'
             styles = [f'background-color: {color}'] * len(row)
-            if "❌" in str(row['Heure/Suggestion']):
+            if "❌" in str(row['Heure / Suggestion']):
                 styles[3] = 'background-color: #ff4b4b; color: white; font-weight: bold'
             return styles
 
