@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 
-# Zones de proximité pour regrouper les agents
+# Zones de proximité
 ZONES = {
     'Bethusy A': 'Chailly', 'Bethusy B': 'Chailly',
     'Montolieu A': 'Montolieu', 'Montolieu B': 'Montolieu',
@@ -18,19 +18,24 @@ uploaded_file = st.file_uploader("Glissez votre fichier Excel ici", type=['csv',
 if uploaded_file:
     try:
         df = pd.read_csv(uploaded_file) if uploaded_file.name.endswith('.csv') else pd.read_excel(uploaded_file, engine='openpyxl')
+        
+        # 1. NETTOYAGE ANTI-NAN (On supprime les lignes vides du bas de l'Excel)
+        df = df.dropna(how='all') # Supprime les lignes totalement vides
         df.columns = df.columns.str.strip()
+        
+        # On remplace les cases vides restantes par du texte vide pour éviter l'affichage "NaN"
+        df = df.fillna('')
 
-        # 1. NETTOYAGE DE LA DATE (On retire les heures moches)
+        # 2. NETTOYAGE DE LA DATE
         df['Date'] = pd.to_datetime(df['Date']).dt.strftime('%d/%m/%Y')
 
-        # 2. Préparation du tri par Zone
+        # 3. Préparation du tri
         df['Zone'] = df['Batiment'].map(ZONES).fillna('Autre')
         df['Heure_Tri'] = df['Heure'].astype(str).str.lower().str.strip().replace('libre', '23:59:00')
         
-        # Tri : Date d'abord, puis Zone (pour que Bethusy A et B restent ensemble)
         df = df.sort_values(by=['Date', 'Zone', 'Heure_Tri'])
         
-        # 3. ATTRIBUTION PAR ZONE (L'agent reste dans le même quartier)
+        # 4. ATTRIBUTION PAR ZONE
         agents_noms = ['Maria Claret', 'Celine', 'Maria Elisabeth']
         df['Group_ID'] = df['Date'].astype(str) + "_" + df['Zone']
         
@@ -38,12 +43,11 @@ if uploaded_file:
         mapping_agent = {grp: agents_noms[i % len(agents_noms)] for i, grp in enumerate(groupes_uniques)}
         df['Agent_Attribue'] = df['Group_ID'].map(mapping_agent)
 
-        # 4. SUGGESTION D'HORAIRE
+        # 5. SUGGESTION D'HORAIRE
         suggestions = []
         for i, row in df.iterrows():
             h_val = str(row['Heure']).lower().strip()
-            if 'libre' in h_val:
-                # Cherche une heure fixe du même agent le même jour
+            if 'libre' in h_val or h_val == '':
                 fixes = df[(df['Date'] == row['Date']) & 
                            (df['Agent_Attribue'] == row['Agent_Attribue']) & 
                            (~df['Heure'].astype(str).str.lower().str.contains('libre'))]
@@ -59,14 +63,15 @@ if uploaded_file:
                     suggestions.append("09:00 (Libre)")
             else:
                 try:
+                    # On affiche juste HH:MM sans les secondes
                     suggestions.append(pd.to_datetime(h_val).strftime('%H:%M'))
                 except:
                     suggestions.append(h_val)
 
         df['Heure_Finale'] = suggestions
 
-        # 5. AFFICHAGE FINAL PROPRE
-        st.success("✅ Planning optimisé et dates nettoyées !")
+        # 6. AFFICHAGE FINAL SANS NAN
+        st.success("✅ Planning propre (sans NaN) !")
         vue = df[['ID', 'Batiment', 'Date', 'Heure_Finale', 'Type', 'Agent_Attribue']]
         st.dataframe(vue.rename(columns={'Heure_Finale': 'Heure / Suggestion'}), use_container_width=True)
         
