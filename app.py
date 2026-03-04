@@ -13,7 +13,7 @@ ZONES = {
 st.set_page_config(page_title="Planning Lausanne Pro", layout="wide")
 st.title("📍 Planning : Unité Logement (Sécurité Anti-Conflit)")
 
-# --- BARRE LATÉRALE ---
+# --- BARRE LATÉRALE : GESTION DES AGENTS ---
 st.sidebar.header("⚙️ Configuration")
 st.sidebar.subheader("Agents disponibles")
 check_maria_c = st.sidebar.checkbox("Maria Claret", value=True)
@@ -29,7 +29,7 @@ uploaded_file = st.file_uploader("Étape 1 : Glissez votre fichier Excel ici", t
 
 if uploaded_file:
     if not agents_actifs:
-        st.error("⚠️ Veuillez sélectionner au moins un agent.")
+        st.error("⚠️ Veuillez sélectionner au moins un agent disponible.")
     else:
         try:
             df = pd.read_csv(uploaded_file) if uploaded_file.name.endswith('.csv') else pd.read_excel(uploaded_file, engine='openpyxl')
@@ -41,9 +41,9 @@ if uploaded_file:
             df['Date_Format'] = df['Date_Obj'].dt.strftime('%d/%m/%Y')
             df['Zone'] = df['Batiment'].map(ZONES).fillna('Autre')
             
-            # Tri intelligent : Priorité aux heures fixes, puis les "Libre" s'insèrent
-            df['Heure_Tri'] = df['Heure'].astype(str).str.lower().str.strip().replace('libre', '23:59')
-            df = df.sort_values(by=['Date_Obj', 'Heure_Tri', 'Zone'])
+            # Tri : Date -> Agent -> Heure (pour détecter les collisions par personne)
+            df['Heure_Tri'] = df['Heure'].astype(str).str.lower().str.strip().replace('libre', '23:59:00')
+            df = df.sort_values(by=['Date_Obj', 'Zone', 'Heure_Tri'])
             
             # 3. Attribution des agents
             df['Group_ID'] = df['Date_Format'] + "_" + df['Zone']
@@ -54,7 +54,7 @@ if uploaded_file:
             # 4. Logique Horaires avec Détection de Conflit
             suggestions = []
             fin_mission_agent = {} 
-            # On trie par agent pour vérifier la chronologie
+            # Re-trier par agent pour la vérification chronologique
             df = df.sort_values(by=['Date_Obj', 'Agent_Attribue', 'Heure_Tri'])
 
             for i, row in df.iterrows():
@@ -66,10 +66,10 @@ if uploaded_file:
                     fin_mission_agent[cle_agent] = datetime.strptime("08:00", "%H:%M")
 
                 if h_brute != 'libre' and h_brute != '':
-                    # CAS HEURE FIXE : Vérification de collision
+                    # CAS HEURE FIXE
                     try:
                         h_fixe = datetime.strptime(h_brute[:5].replace('h', ':'), "%H:%M")
-                        # Si l'heure fixe commence AVANT que la mission précédente ne finisse
+                        # DETECTION DE CONFLIT : Si l'heure fixe commence avant la fin de la mission précédente
                         if h_fixe < fin_mission_agent[cle_agent] and fin_mission_agent[cle_agent] > datetime.strptime("08:00", "%H:%M"):
                             suggestions.append(f"❌ CONFLIT: {h_fixe.strftime('%H:%M')}")
                         else:
@@ -90,21 +90,24 @@ if uploaded_file:
 
             df['Heure_Finale'] = suggestions
 
-            # 5. Style et Affichage
+            # 5. Fonction de Style pour les Couleurs et Alertes
             def style_tableau(row):
-                styles = [''] * len(row)
-                # Couleur par agent
+                # Par défaut, on applique la couleur de l'agent
                 agent = row['Agent_Attribue']
-                bg_color = ''
-                if agent == 'Maria Claret': bg_color = 'background-color: #ffdae0'
-                elif agent == 'Celine': bg_color = 'background-color: #d1e9ff'
-                elif agent == 'Maria Elisabeth': bg_color = 'background-color: #d4f8d4'
+                color = ''
+                if agent == 'Maria Claret': color = 'background-color: #ffdae0'
+                elif agent == 'Celine': color = 'background-color: #d1e9ff'
+                elif agent == 'Maria Elisabeth': color = 'background-color: #d4f8d4'
                 
-                for i in range(len(styles)): styles[i] = bg_color
+                styles = [color] * len(row)
                 
-                # Alerte Conflit en Rouge
+                # Alerte Conflit en Rouge Vif
                 if "❌ CONFLIT" in str(row['Heure_Finale']):
                     styles[3] = 'background-color: #ff4b4b; color: white; font-weight: bold'
+                # Alerte Trop tard en Orange
+                elif "⚠️ Trop tard" in str(row['Heure_Finale']):
+                    styles[3] = 'background-color: #ffa500; color: black; font-weight: bold'
+                    
                 return styles
 
             # Filtre par jour
@@ -115,6 +118,8 @@ if uploaded_file:
             df_final = df_affiche[['ID', 'Batiment', 'Date_Format', 'Heure_Finale', 'Type', 'Agent_Attribue']]
             df_final = df_final.rename(columns={'Date_Format': 'Date', 'Heure_Finale': 'Heure / Suggestion'})
 
+            # Affichage Final
+            st.success(f"Planning généré pour {len(agents_actifs)} agent(s) actif(s).")
             st.table(df_final.style.apply(style_tableau, axis=1))
             
         except Exception as e:
