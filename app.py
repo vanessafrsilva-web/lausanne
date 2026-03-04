@@ -19,65 +19,69 @@ if uploaded_file:
     try:
         df = pd.read_csv(uploaded_file) if uploaded_file.name.endswith('.csv') else pd.read_excel(uploaded_file, engine='openpyxl')
         
-        # 1. NETTOYAGE ANTI-NAN (On supprime les lignes vides du bas de l'Excel)
-        df = df.dropna(how='all') # Supprime les lignes totalement vides
+        # 1. Nettoyage
+        df = df.dropna(how='all').fillna('')
         df.columns = df.columns.str.strip()
-        
-        # On remplace les cases vides restantes par du texte vide pour éviter l'affichage "NaN"
-        df = df.fillna('')
 
-        # 2. NETTOYAGE DE LA DATE
-        df['Date'] = pd.to_datetime(df['Date']).dt.strftime('%d/%m/%Y')
-
-        # 3. Préparation du tri
+        # 2. Préparation du tri (Date -> Zone -> Heure)
+        # On traite les dates proprement pour l'affichage
+        df['Date_Format'] = pd.to_datetime(df['Date']).dt.strftime('%d/%m/%Y')
         df['Zone'] = df['Batiment'].map(ZONES).fillna('Autre')
         df['Heure_Tri'] = df['Heure'].astype(str).str.lower().str.strip().replace('libre', '23:59:00')
         
+        # Tri par Date, Zone, puis Heure
         df = df.sort_values(by=['Date', 'Zone', 'Heure_Tri'])
         
-        # 4. ATTRIBUTION PAR ZONE
+        # 3. Attribution par Zone (L'agent reste dans le même quartier)
         agents_noms = ['Maria Claret', 'Celine', 'Maria Elisabeth']
         df['Group_ID'] = df['Date'].astype(str) + "_" + df['Zone']
-        
         groupes_uniques = df['Group_ID'].unique()
         mapping_agent = {grp: agents_noms[i % len(agents_noms)] for i, grp in enumerate(groupes_uniques)}
         df['Agent_Attribue'] = df['Group_ID'].map(mapping_agent)
 
-        # 5. SUGGESTION D'HORAIRE
+        # 4. LOGIQUE ANTI-DOUBLON (Décalage intelligent)
         suggestions = []
+        # On va garder en mémoire la "dernière heure de fin" pour chaque agent chaque jour
+        derniere_heure_agent = {} 
+
         for i, row in df.iterrows():
-            h_val = str(row['Heure']).lower().strip()
-            if 'libre' in h_val or h_val == '':
-                fixes = df[(df['Date'] == row['Date']) & 
-                           (df['Agent_Attribue'] == row['Agent_Attribue']) & 
-                           (~df['Heure'].astype(str).str.lower().str.contains('libre'))]
-                
-                if not fixes.empty:
-                    try:
-                        h_ref = pd.to_datetime(str(fixes.iloc[0]['Heure']), errors='coerce')
-                        sugg = (h_ref + timedelta(hours=1, minutes=15)).strftime('%H:%M')
-                        suggestions.append(f"Suggéré: {sugg}")
-                    except:
-                        suggestions.append("10:00 (Libre)")
-                else:
-                    suggestions.append("09:00 (Libre)")
-            else:
+            cle_agent = f"{row['Date']}_{row['Agent_Attribue']}"
+            h_brute = str(row['Heure']).lower().strip()
+            
+            # Si c'est une heure FIXE
+            if h_brute != 'libre' and h_brute != '':
                 try:
-                    # On affiche juste HH:MM sans les secondes
-                    suggestions.append(pd.to_datetime(h_val).strftime('%H:%M'))
+                    h_dt = pd.to_datetime(h_brute)
+                    heure_finale = h_dt.strftime('%H:%M')
+                    # On note que cet agent est occupé jusqu'à cette heure + 1h15
+                    derniere_heure_agent[cle_agent] = h_dt + timedelta(hours=1, minutes=15)
+                    suggestions.append(heure_finale)
                 except:
-                    suggestions.append(h_val)
+                    suggestions.append(h_brute)
+            
+            # Si c'est "LIBRE"
+            else:
+                # Si l'agent a déjà eu une mission avant ce jour-là
+                if cle_agent in derniere_heure_agent:
+                    nouvelle_h = derniere_heure_agent[cle_agent]
+                    suggestions.append(f"Suggéré: {nouvelle_h.strftime('%H:%M')}")
+                    # On met à jour son heure de fin pour la mission suivante
+                    derniere_heure_agent[cle_agent] = nouvelle_h + timedelta(hours=1, minutes=15)
+                else:
+                    # Première mission de la journée
+                    suggestions.append("09:00 (Suggéré)")
+                    derniere_heure_agent[cle_agent] = datetime.strptime("09:00", "%H:%M") + timedelta(hours=1, minutes=15)
 
         df['Heure_Finale'] = suggestions
 
-        # 6. AFFICHAGE FINAL SANS NAN
-        st.success("✅ Planning propre (sans NaN) !")
-        vue = df[['ID', 'Batiment', 'Date', 'Heure_Finale', 'Type', 'Agent_Attribue']]
-        st.dataframe(vue.rename(columns={'Heure_Finale': 'Heure / Suggestion'}), use_container_width=True)
+        # 5. Affichage final
+        st.success("✅ Planning optimisé : Plus de doublons d'horaires !")
+        vue = df[['ID', 'Batiment', 'Date_Format', 'Heure_Finale', 'Type', 'Agent_Attribue']]
+        st.dataframe(vue.rename(columns={'Date_Format': 'Date', 'Heure_Finale': 'Heure / Suggestion'}), use_container_width=True)
         
         # Export
         csv = vue.to_csv(index=False).encode('utf-8-sig')
-        st.download_button("📥 Télécharger le planning final", csv, "planning_lausanne.csv", "text/csv")
+        st.download_button("📥 Télécharger le planning sans doublons", csv, "planning_final.csv", "text/csv")
 
     except Exception as e:
         st.error(f"Erreur : {e}")
