@@ -11,7 +11,7 @@ ZONES = {
 }
 
 st.set_page_config(page_title="Planning Lausanne Pro", layout="wide")
-st.title("📍 Planning : Unité Logement (Correction Finale)")
+st.title("📍 Planning : Unité Logement (Zéro Faux Conflit)")
 
 # --- BARRE LATÉRALE ---
 st.sidebar.header("⚙️ Configuration")
@@ -37,53 +37,57 @@ if uploaded_file and agents_actifs:
         df['Date_F'] = df['Date_Obj'].dt.strftime('%d/%m/%Y')
         df['Zone_Affiche'] = df['Batiment'].map(ZONES).fillna('Autre')
         
-        # Tri initial
+        # Tri technique
         df['H_Tri'] = df['Heure'].astype(str).str.lower().str.strip().replace('libre', '00:00')
         df = df.sort_values(by=['Date_Obj', 'Zone_Affiche', 'H_Tri'])
         
-        # 3. Attribution (Répartition par Zone)
+        # 3. Attribution des agents par Zone
         df['GID'] = df['Date_F'] + "_" + df['Zone_Affiche']
         grps = df['GID'].unique()
         map_agt = {g: agents_actifs[i % len(agents_actifs)] for i, g in enumerate(grps)}
         df['Agent_Attribue'] = df['GID'].map(map_agt)
 
-        # 4. Logique de Calcul INDIVIDUELLE (Correction Maria Claret vs Elisabeth)
+        # 4. Logique de Calcul avec ISOLATION STRICTE par AGENT
+        # On trie pour calculer le planning agent par agent sans mélange
         df = df.sort_values(by=['Date_Obj', 'Agent_Attribue', 'H_Tri'])
         suggestions = []
-        fin_par_cle = {} 
-        zone_par_cle = {} 
+        fin_par_agent_unique = {} 
+        zone_par_agent_unique = {} 
 
         for i, row in df.iterrows():
-            agent_nom_complet = row['Agent_Attribue'] # On utilise le nom complet pour différencier les Maria
+            # CLÉ UNIQUE : On utilise le nom COMPLET pour différencier Maria Claret de Maria Elisabeth
+            nom_complet = row['Agent_Attribue']
             jour = row['Date_F']
-            cle_unique = f"{jour}_{agent_nom_complet}" 
+            cle_securisee = f"{jour}_{nom_complet}" 
             
             h_in = str(row['Heure']).lower().strip()
             zone_actuelle = row['Zone_Affiche']
             duree_rdv = timedelta(hours=1, minutes=15)
 
-            if cle_unique not in fin_par_cle:
-                fin_par_cle[cle_unique] = datetime.strptime("08:00", "%H:%M")
-                zone_par_cle[cle_unique] = zone_actuelle
+            # Initialisation pour chaque agent unique par jour
+            if cle_securisee not in fin_par_agent_unique:
+                fin_par_agent_unique[cle_securisee] = datetime.strptime("08:00", "%H:%M")
+                zone_par_agent_unique[cle_securisee] = zone_actuelle
 
-            if zone_actuelle != zone_par_cle[cle_unique]:
-                fin_par_cle[cle_unique] += timedelta(minutes=30)
+            # Trajet individuel
+            if zone_actuelle != zone_par_agent_unique[cle_securisee]:
+                fin_par_agent_unique[cle_securisee] += timedelta(minutes=30)
             
-            zone_par_cle[cle_unique] = zone_actuelle
+            zone_par_agent_unique[cle_securisee] = zone_actuelle
 
             if h_in != 'libre' and h_in != '':
                 try:
                     h_dt = datetime.strptime(h_in[:5].replace('h', ':'), "%H:%M")
-                    # On vérifie si l'agent PRÉCIS est occupé
-                    if h_dt < fin_par_cle[cle_unique] and fin_par_cle[cle_unique] > datetime.strptime("08:00", "%H:%M"):
+                    # On compare uniquement avec le planning de CET agent précis
+                    if h_dt < fin_par_agent_unique[cle_securisee] and fin_par_agent_unique[cle_securisee] > datetime.strptime("08:00", "%H:%M"):
                         suggestions.append(f"❌ CONFLIT: {h_dt.strftime('%H:%M')}")
                     else:
                         suggestions.append(h_dt.strftime('%H:%M'))
-                    fin_par_cle[cle_unique] = h_dt + duree_rdv
+                    fin_par_agent_unique[cle_securisee] = h_dt + duree_rdv
                 except:
                     suggestions.append(h_in)
             else:
-                h_s = fin_par_cle[cle_unique]
+                h_s = fin_par_agent_unique[cle_securisee]
                 if h_s + duree_rdv > datetime.strptime("12:00", "%H:%M") and h_s < datetime.strptime("13:00", "%H:%M"):
                     h_s = datetime.strptime("13:00", "%H:%M")
                 
@@ -91,11 +95,11 @@ if uploaded_file and agents_actifs:
                     suggestions.append("⚠️ Trop tard")
                 else:
                     suggestions.append(f"Suggéré: {h_s.strftime('%H:%M')}")
-                    fin_par_cle[cle_unique] = h_s + duree_rdv
+                    fin_par_agent_unique[cle_securisee] = h_s + duree_rdv
 
         df['Heure_Finale'] = suggestions
 
-        # 5. Affichage final
+        # 5. Affichage
         dates = ["Toutes les dates"] + sorted(df['Date_F'].unique().tolist())
         sel_date = st.sidebar.selectbox("Choisir un jour :", dates)
         
@@ -105,6 +109,7 @@ if uploaded_file and agents_actifs:
 
         def apply_style(row):
             agt = row['Agent_Attribue']
+            # Couleurs spécifiques par agent
             color = '#ffdae0' if agt == 'Maria Claret' else '#d1e9ff' if agt == 'Celine' else '#d4f8d4'
             styles = [f'background-color: {color}'] * len(row)
             if "❌" in str(row['Heure/Suggestion']):
