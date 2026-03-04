@@ -1,7 +1,8 @@
 import streamlit as st
 import pandas as pd
+from datetime import datetime, timedelta
 
-# Dictionnaire des zones de Lausanne
+# Configuration Lausanne
 ZONES = {
     'Bethusy A': 'Chailly', 'Bethusy B': 'Chailly',
     'Montolieu A': 'Montolieu', 'Montolieu B': 'Montolieu',
@@ -10,41 +11,51 @@ ZONES = {
 }
 
 st.set_page_config(page_title="Planning Lausanne", layout="wide")
-st.title("📍 Optimisation des Attributions")
+st.title("📍 Planning : Maria Claret, Celine, Maria Elisabeth")
 
-uploaded_file = st.file_uploader("Glissez votre fichier Excel ou CSV ici", type=['csv', 'xlsx'])
+uploaded_file = st.file_uploader("Glissez votre fichier Excel ici", type=['csv', 'xlsx'])
 
 if uploaded_file:
-    # Lecture intelligente du fichier
-    try:
-        if uploaded_file.name.endswith('.csv'):
-            df = pd.read_csv(uploaded_file)
-        else:
-            # On utilise openpyxl pour lire le format .xlsx
-            df = pd.read_excel(uploaded_file, engine='openpyxl')
+    df = pd.read_csv(uploaded_file) if uploaded_file.name.endswith('.csv') else pd.read_excel(uploaded_file, engine='openpyxl')
+    df.columns = df.columns.str.strip()
 
-        # Nettoyage des colonnes (enlève les espaces comme dans 'Date ')
-        df.columns = df.columns.str.strip()
-        
-        # Attribution des zones
-        df['Zone'] = df['Batiment'].map(ZONES)
-        
-        # Gestion du tri (Date, puis Zone pour regrouper, puis Heure)
-        df['Heure_Tri'] = df['Heure'].astype(str).replace('libre', '23:59')
-        df = df.sort_values(by=['Date', 'Zone', 'Heure_Tri'])
-        
-        # Attribution équitable sur 3 agents
-        agents = ['Agent 1', 'Agent 2', 'Agent 3']
-        df['Agent_Attribue'] = [agents[i % 3] for i in range(len(df))]
-        
-        # Affichage du résultat
-        st.success("✅ Planning généré avec succès !")
-        colonnes_a_afficher = ['ID', 'Batiment', 'Date', 'Heure', 'Type', 'Agent_Attribue']
-        st.dataframe(df[colonnes_a_afficher], use_container_width=True)
-        
-        # Exportation
-        csv = df.to_csv(index=False).encode('utf-8-sig')
-        st.download_button("📥 Télécharger le résultat pour Excel", csv, "planning_final.csv", "text/csv")
+    # 1. Attribution des zones et agents
+    df['Zone'] = df['Batiment'].map(ZONES)
+    
+    # Tri intelligent
+    df['Heure_Tri'] = df['Heure'].astype(str).replace('libre', '23:59')
+    df = df.sort_values(by=['Date', 'Zone', 'Heure_Tri'])
+    
+    # Noms des agents
+    agents = ['Maria Claret', 'Celine', 'Maria Elisabeth']
+    df['Agent_Attribue'] = [agents[i % 3] for i in range(len(df))]
+    
+    # 2. LOGIQUE DES HORAIRES SUGGÉRÉS
+    def suggerer_heure(row, group):
+        current_heure = str(row['Heure']).lower()
+        if 'libre' in current_heure:
+            # On cherche s'il y a une autre mission avec une heure fixe pour cet agent ce jour-là
+            autres = group[(group['Agent_Attribue'] == row['Agent_Attribue']) & (group['Heure'].astype(str).lower() != 'libre')]
+            if not autres.empty:
+                ref_heure = pd.to_datetime(autres.iloc[0]['Heure'], format='%H:%M:%S', errors='coerce')
+                if pd.isna(ref_heure): # Test format court %H:%M
+                     ref_heure = pd.to_datetime(autres.iloc[0]['Heure'], format='%H:%M', errors='coerce')
+                
+                # On suggère 1h30 après la mission fixe
+                suggested = (ref_heure + timedelta(hours=1, minutes=30)).strftime('%H:%M')
+                return f"Suggéré: {suggested} (Libre)"
+            return "À définir (Libre)"
+        return current_heure
 
-    except Exception as e:
-        st.error(f"Oups ! Il y a un souci avec le fichier : {e}")
+    # On applique la suggestion par groupe de Date
+    df['Heure_Finale'] = df.apply(lambda x: suggerer_heure(x, df[df['Date'] == x['Date']]), axis=1)
+
+    # 3. Affichage
+    st.success("✅ Planning optimisé avec les horaires suggérés !")
+    
+    final_view = df[['ID', 'Batiment', 'Date', 'Heure_Finale', 'Type', 'Agent_Attribue']]
+    st.dataframe(final_view.rename(columns={'Heure_Finale': 'Heure/Suggestion'}), use_container_width=True)
+    
+    # Export
+    csv = final_view.to_csv(index=False).encode('utf-8-sig')
+    st.download_button("📥 Télécharger le Planning Maria & Celine", csv, "planning_equipe.csv", "text/csv")
