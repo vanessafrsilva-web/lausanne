@@ -11,7 +11,7 @@ ZONES = {
 }
 
 st.set_page_config(page_title="Planning Lausanne Pro", layout="wide")
-st.title("📍 Planning : Unité Logement (Individuel)")
+st.title("📍 Planning : Unité Logement (Version Corrigée)")
 
 # --- BARRE LATÉRALE ---
 st.sidebar.header("⚙️ Configuration")
@@ -28,6 +28,7 @@ uploaded_file = st.file_uploader("Étape 1 : Glissez votre fichier Excel ici", t
 
 if uploaded_file and agents_actifs:
     try:
+        # Lecture du fichier
         df = pd.read_csv(uploaded_file) if uploaded_file.name.endswith('.csv') else pd.read_excel(uploaded_file, engine='openpyxl')
         df = df.dropna(how='all').fillna('')
         df.columns = df.columns.str.strip()
@@ -37,7 +38,7 @@ if uploaded_file and agents_actifs:
         df['Date_F'] = df['Date_Obj'].dt.strftime('%d/%m/%Y')
         df['Zone_Affiche'] = df['Batiment'].map(ZONES).fillna('Autre')
         
-        # Tri : On place les "Libre" en priorité pour le calcul du matin
+        # Tri initial pour grouper par zone
         df['H_Tri'] = df['Heure'].astype(str).str.lower().str.strip().replace('libre', '00:00')
         df = df.sort_values(by=['Date_Obj', 'Zone_Affiche', 'H_Tri'])
         
@@ -47,31 +48,29 @@ if uploaded_file and agents_actifs:
         map_agt = {g: agents_actifs[i % len(agents_actifs)] for i, g in enumerate(grps)}
         df['Agent_Attribue'] = df['GID'].map(map_agt)
 
-        # 4. Logique Horaires INDIVIDUELLE
+        # 4. Logique Horaires INDIVIDUELLE (Sans mélange entre agents)
         suggestions = []
-        # On trie impérativement par DATE puis par AGENT pour ne pas mélanger les plannings
-        df = df.sort_values(by=['Date_Obj', 'Agent_Attribue', 'H_Tri'])
-
-        # Dictionnaires pour suivre chaque agent séparément
         fin_par_agent = {} 
         zone_par_agent = {} 
+
+        # On trie pour calculer le planning de chaque agent l'un après l'autre
+        df = df.sort_values(by=['Date_Obj', 'Agent_Attribue', 'H_Tri'])
 
         for i, row in df.iterrows():
             agent = row['Agent_Attribue']
             jour = row['Date_F']
-            cle_unique = f"{jour}_{agent}" # Exemple: "22/04/2026_Celine"
+            cle_unique = f"{jour}_{agent}" 
             
             h_in = str(row['Heure']).lower().strip()
             zone_actuelle = row['Zone_Affiche']
             duree_mission = timedelta(hours=1, minutes=15)
 
-            # Initialisation spécifique à cet agent pour ce jour précis
+            # Initialisation si premier RDV de la journée pour cet agent
             if cle_unique not in fin_par_agent:
                 fin_par_agent[cle_unique] = datetime.strptime("08:00", "%H:%M")
-                zone_par_agent[cle_agent] = zone_actuelle if 'cle_agent' in locals() else zone_actuelle
                 zone_par_agent[cle_unique] = zone_actuelle
 
-            # Trajet : +30 min SI l'agent change de zone par rapport à sa mission précédente
+            # Trajet : +30 min si changement de zone
             if zone_actuelle != zone_par_agent[cle_unique]:
                 fin_par_agent[cle_unique] += timedelta(minutes=30)
             
@@ -81,32 +80,33 @@ if uploaded_file and agents_actifs:
                 # HEURE FIXE
                 try:
                     h_dt = datetime.strptime(h_in[:5].replace('h', ':'), "%H:%M")
-                    # CONFLIT uniquement si CET agent est déjà occupé
+                    # CONFLIT RÉEL (Seulement si l'agent lui-même est occupé)
                     if h_dt < fin_par_agent[cle_unique] and fin_par_agent[cle_unique] > datetime.strptime("08:00", "%H:%M"):
                         suggestions.append(f"❌ CONFLIT: {h_dt.strftime('%H:%M')}")
                     else:
                         suggestions.append(h_dt.strftime('%H:%M'))
                     fin_par_agent[cle_unique] = h_dt + duree_mission
-                except: suggestions.append(h_in)
+                except: 
+                    suggestions.append(h_in)
             else:
-                # HEURE LIBRE (Suggestion terrain dès 08h00)
+                # HEURE LIBRE (Suggestion terrain)
                 h_s = fin_par_agent[cle_unique]
                 if h_s + duree_mission > datetime.strptime("12:00", "%H:%M") and h_s < datetime.strptime("13:00", "%H:%M"):
                     h_s = datetime.strptime("13:00", "%H:%M")
                 
                 if h_s > datetime.strptime("15:00", "%H:%M"):
-                    suggestions.append("⚠️ Trop tard (Après 15h)")
+                    suggestions.append("⚠️ Trop tard")
                 else:
                     suggestions.append(f"Suggéré: {h_s.strftime('%H:%M')}")
                     fin_par_agent[cle_unique] = h_s + duree_mission
 
         df['Heure_Finale'] = suggestions
 
-        # 5. Affichage
+        # 5. Affichage final
         dates = ["Toutes les dates"] + sorted(df['Date_F'].unique().tolist())
         sel_date = st.sidebar.selectbox("Choisir un jour :", dates)
-        df_view = df[df['Date_F'] == sel_date].copy() if sel_date != "Toutes les dates" else df.copy()
         
+        df_view = df[df['Date_F'] == sel_date].copy() if sel_date != "Toutes les dates" else df.copy()
         df_final = df_view[['ID', 'Batiment', 'Date_F', 'Heure_Finale', 'Type', 'Agent_Attribue']]
         df_final = df_final.rename(columns={'Date_F': 'Date', 'Heure_Finale': 'Heure/Suggestion'})
 
@@ -122,3 +122,5 @@ if uploaded_file and agents_actifs:
 
     except Exception as e:
         st.error(f"Erreur technique : {e}")
+elif not agents_actifs:
+    st.warning("Veuillez cocher au moins un agent disponible à gauche.")
