@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 
-# 1. Configuration des Zones et Trajets
+# 1. Configuration des Zones
 ZONES = {
     'Bethusy A': 'Chailly', 'Bethusy B': 'Chailly',
     'Montolieu A': 'Montolieu', 'Montolieu B': 'Montolieu',
@@ -10,8 +10,8 @@ ZONES = {
     'Tunnel': 'Riponne', 'Oron': 'Oron'
 }
 
-st.set_page_config(page_title="Planning Lausanne Expert", layout="wide")
-st.title("📍 Planning : Unité Logement (Dès 06h30)")
+st.set_page_config(page_title="Planning Lausanne Pro", layout="wide")
+st.title("📍 Planning : Unité Logement (Terrain 08h-15h)")
 
 # --- BARRE LATÉRALE ---
 st.sidebar.header("⚙️ Configuration")
@@ -37,7 +37,7 @@ if uploaded_file and agents_actifs:
         df['Date_F'] = df['Date_Obj'].dt.strftime('%d/%m/%Y')
         df['Zone_Affiche'] = df['Batiment'].map(ZONES).fillna('Autre')
         
-        # Tri : Priorité Matin (Libre en premier dans le calcul)
+        # Tri : On place les "Libre" en priorité pour le calcul du matin
         df['H_Tri'] = df['Heure'].astype(str).str.lower().str.strip().replace('libre', '00:00')
         df = df.sort_values(by=['Date_Obj', 'Zone_Affiche', 'H_Tri'])
         
@@ -47,10 +47,10 @@ if uploaded_file and agents_actifs:
         map_agt = {g: agents_actifs[i % len(agents_actifs)] for i, g in enumerate(grps)}
         df['Agent_Attribue'] = df['GID'].map(map_agt)
 
-        # 4. Logique Horaires (Start 06:30 | Entrée 1h | Sortie 1h | Trajet Zone)
+        # 4. Logique Horaires (Terrain dès 08:00 | Fin départ 15:00)
         suggestions = []
         fin_agt = {} 
-        derniere_zone_agt = {} # Pour calculer le trajet si changement de zone
+        derniere_zone_agt = {} 
 
         df = df.sort_values(by=['Date_Obj', 'Agent_Attribue', 'H_Tri'])
 
@@ -59,36 +59,42 @@ if uploaded_file and agents_actifs:
             h_in = str(row['Heure']).lower().strip()
             zone_actuelle = row['Zone_Affiche']
             
-            # Temps de base pour une mission (Entrée ou Sortie = 1h + 15 min de battement)
+            # Mission (1h) + Battement local (15 min)
             duree_mission = timedelta(hours=1, minutes=15)
 
+            # INITIALISATION : Premier RDV de la journée à 08h00
             if key not in fin_agt:
-                fin_agt[key] = datetime.strptime("06:30", "%H:%M") # Début de journée
+                fin_agt[key] = datetime.strptime("08:00", "%H:%M")
                 derniere_zone_agt[key] = zone_actuelle
 
-            # AJOUT TEMPS DE TRAJET : Si l'agent change de zone (ex: Lausanne -> Oron)
+            # TRAJET : +30 min si on change de zone (ex: Lausanne -> Oron)
             if zone_actuelle != derniere_zone_agt[key]:
-                fin_agt[key] += timedelta(minutes=30) # +30 min de route entre zones
+                fin_agt[key] += timedelta(minutes=30)
             
             derniere_zone_agt[key] = zone_actuelle
 
             if h_in != 'libre' and h_in != '':
+                # HEURE FIXE (Demandée par locataire)
                 try:
                     h_dt = datetime.strptime(h_in[:5].replace('h', ':'), "%H:%M")
-                    if h_dt < fin_agt[key] and fin_agt[key] > datetime.strptime("06:30", "%H:%M"):
+                    # CONFLIT : Si l'heure fixe arrive avant la fin du trajet/RDV précédent
+                    if h_dt < fin_agt[key] and fin_agt[key] > datetime.strptime("08:00", "%H:%M"):
                         suggestions.append(f"❌ CONFLIT: {h_dt.strftime('%H:%M')}")
                     else:
                         suggestions.append(h_dt.strftime('%H:%M'))
                     fin_agt[key] = h_dt + duree_mission
                 except: suggestions.append(h_in)
             else:
+                # HEURE LIBRE (Suggestion terrain dès 08h00)
                 h_s = fin_agt[key]
+                
                 # Pause midi 12h-13h
                 if h_s + duree_mission > datetime.strptime("12:00", "%H:%M") and h_s < datetime.strptime("13:00", "%H:%M"):
                     h_s = datetime.strptime("13:00", "%H:%M")
                 
+                # Alerte si départ après 15h00
                 if h_s > datetime.strptime("15:00", "%H:%M"):
-                    suggestions.append("⚠️ Trop tard (Max 15h)")
+                    suggestions.append("⚠️ Trop tard (Après 15h)")
                 else:
                     suggestions.append(f"Suggéré: {h_s.strftime('%H:%M')}")
                     fin_agt[key] = h_s + duree_mission
