@@ -11,7 +11,7 @@ ZONES = {
 }
 
 st.set_page_config(page_title="Planning Lausanne", layout="wide")
-st.title("📍 Planning : Maria, Celine & Elisabeth")
+st.title("📍 Planning : Optimisation Attributions Unité Logement")
 
 uploaded_file = st.file_uploader("Glissez votre fichier Excel ici", type=['csv', 'xlsx'])
 
