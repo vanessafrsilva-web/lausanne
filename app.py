@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 
-# Zones de proximité
+# 1. Configuration des Zones de Lausanne
 ZONES = {
     'Bethusy A': 'Chailly', 'Bethusy B': 'Chailly',
     'Montolieu A': 'Montolieu', 'Montolieu B': 'Montolieu',
@@ -11,114 +11,36 @@ ZONES = {
 }
 
 st.set_page_config(page_title="Planning Lausanne Couleurs", layout="wide")
-st.title("📍 Planning : Optimisation Attributions Unité Logemen")
+st.title("📍 Planning : Optimisation Attributions Unité Logement")
 
 uploaded_file = st.file_uploader("Glissez votre fichier Excel ici", type=['csv', 'xlsx'])
 
 if uploaded_file:
     try:
+        # Lecture du fichier
         df = pd.read_csv(uploaded_file) if uploaded_file.name.endswith('.csv') else pd.read_excel(uploaded_file, engine='openpyxl')
         
-        # 1. Nettoyage
+        # 2. Nettoyage initial
         df = df.dropna(how='all').fillna('')
         df.columns = df.columns.str.strip()
 
-        # 2. Préparation du tri
+        # 3. Préparation du tri et des dates
         df['Date_Format'] = pd.to_datetime(df['Date']).dt.strftime('%d/%m/%Y')
         df['Zone'] = df['Batiment'].map(ZONES).fillna('Autre')
         df['Heure_Tri'] = df['Heure'].astype(str).str.lower().str.strip().replace('libre', '23:59:00')
         
+        # Tri par Date, puis Zone (pour grouper les agents), puis Heure
         df = df.sort_values(by=['Date', 'Zone', 'Heure_Tri'])
         
-        # 3. Attribution par Zone
+        # 4. Attribution par Zone (L'agent reste dans le même quartier)
         agents_noms = ['Maria Claret', 'Celine', 'Maria Elisabeth']
         df['Group_ID'] = df['Date'].astype(str) + "_" + df['Zone']
         groupes_uniques = df['Group_ID'].unique()
         mapping_agent = {grp: agents_noms[i % len(agents_noms)] for i, grp in enumerate(groupes_uniques)}
         df['Agent_Attribue'] = df['Group_ID'].map(mapping_agent)
 
-        # 4. Logique Anti-Doublon
+        # 5. Logique Anti-Doublon (Décalage intelligent)
         suggestions = []
-        derniere_heure_agent = {} 
-
-        for i, row in df.iterrows():
-            cle_agent = f"{row['Date']}_{row['Agent_Attribue']}"
-            h_brute = str(row['Heure']).lower().strip()
-            
-            if h_brute != 'libre' and h_brute != '':
-                try:
-                    h_dt = pd.to_datetime(h_brute)
-                    heure_finale = h_dt.strftime('%H:%M')
-                    derniere_heure_agent[cle_agent] = h_dt + timedelta(hours=1, minutes=15)
-                    suggestions.append(heure_finale)
-                except:
-                    suggestions.append(h_brute)
-            else:
-                if cle_agent in derniere_heure_agent:
-                    nouvelle_h = derniere_heure_agent[cle_agent]
-                    suggestions.append(f"Suggéré: {nouvelle_h.strftime('%H:%M')}")
-                    derniere_heure_agent[cle_agent] = nouvelle_h + timedelta(hours=1, minutes=15)
-                else:
-                    suggestions.append("09:00 (Suggéré)")
-                    derniere_heure_agent[cle_agent] = datetime.strptime("09:00", "%H:%M") + timedelta(hours=1, minutes=15)
-
-        df['Heure_Finale'] = suggestions
-        
-        # On prépare le tableau final
-        df_final = df[['ID', 'Batiment', 'Date_Format', 'Heure_Finale', 'Type', 'Agent_Attribue']].copy()
-        df_final = df_final.rename(columns={'Date_Format': 'Date', 'Heure_Finale': 'Heure / Suggestion'})
-
-        # 5. FONCTION DE COULEUR
-        def color_agent(row):
-            agent = row['Agent_Attribue']
-            if agent == 'Maria Claret':
-                return ['background-color: #ffdae0'] * len(row) # Rose
-            elif agent == 'Celine':
-                return ['background-color: #d1e9ff'] * len(row) # Bleu
-            elif agent == 'Maria Elisabeth':
-                return ['background-color: #d4f8d4'] * len(row) # Vert
-            return [''] * len(row)
-
-        # 6. Affichage avec Style
-        st.success("✅ Planning coloré par agent !")
-        st.table(df_final.style.apply(color_agent, axis=1))
-        
-        # Export
-        csv = df_final.to_csv(index=False).encode('utf-8-sig')
-        st.download_button("📥 Télécharger le planning final", csv, "planning_couleurs.csv", "text/csv")
-
-    except Exception as e:
-        st.error(f"Erreur : {e}")
-
-uploaded_file = st.file_uploader("Glissez votre fichier Excel ici", type=['csv', 'xlsx'])
-
-if uploaded_file:
-    try:
-        df = pd.read_csv(uploaded_file) if uploaded_file.name.endswith('.csv') else pd.read_excel(uploaded_file, engine='openpyxl')
-        
-        # 1. Nettoyage
-        df = df.dropna(how='all').fillna('')
-        df.columns = df.columns.str.strip()
-
-        # 2. Préparation du tri (Date -> Zone -> Heure)
-        # On traite les dates proprement pour l'affichage
-        df['Date_Format'] = pd.to_datetime(df['Date']).dt.strftime('%d/%m/%Y')
-        df['Zone'] = df['Batiment'].map(ZONES).fillna('Autre')
-        df['Heure_Tri'] = df['Heure'].astype(str).str.lower().str.strip().replace('libre', '23:59:00')
-        
-        # Tri par Date, Zone, puis Heure
-        df = df.sort_values(by=['Date', 'Zone', 'Heure_Tri'])
-        
-        # 3. Attribution par Zone (L'agent reste dans le même quartier)
-        agents_noms = ['Maria Claret', 'Celine', 'Maria Elisabeth']
-        df['Group_ID'] = df['Date'].astype(str) + "_" + df['Zone']
-        groupes_uniques = df['Group_ID'].unique()
-        mapping_agent = {grp: agents_noms[i % len(agents_noms)] for i, grp in enumerate(groupes_uniques)}
-        df['Agent_Attribue'] = df['Group_ID'].map(mapping_agent)
-
-        # 4. LOGIQUE ANTI-DOUBLON (Décalage intelligent)
-        suggestions = []
-        # On va garder en mémoire la "dernière heure de fin" pour chaque agent chaque jour
         derniere_heure_agent = {} 
 
         for i, row in df.iterrows():
@@ -138,27 +60,40 @@ if uploaded_file:
             
             # Si c'est "LIBRE"
             else:
-                # Si l'agent a déjà eu une mission avant ce jour-là
                 if cle_agent in derniere_heure_agent:
                     nouvelle_h = derniere_heure_agent[cle_agent]
                     suggestions.append(f"Suggéré: {nouvelle_h.strftime('%H:%M')}")
-                    # On met à jour son heure de fin pour la mission suivante
                     derniere_heure_agent[cle_agent] = nouvelle_h + timedelta(hours=1, minutes=15)
                 else:
-                    # Première mission de la journée
                     suggestions.append("09:00 (Suggéré)")
                     derniere_heure_agent[cle_agent] = datetime.strptime("09:00", "%H:%M") + timedelta(hours=1, minutes=15)
 
         df['Heure_Finale'] = suggestions
-
-        # 5. Affichage final
-        st.success("✅ Planning optimisé : Plus de doublons d'horaires !")
-        vue = df[['ID', 'Batiment', 'Date_Format', 'Heure_Finale', 'Type', 'Agent_Attribue']]
-        st.dataframe(vue.rename(columns={'Date_Format': 'Date', 'Heure_Finale': 'Heure / Suggestion'}), use_container_width=True)
         
-        # Export
-        csv = vue.to_csv(index=False).encode('utf-8-sig')
-        st.download_button("📥 Télécharger le planning sans doublons", csv, "planning_final.csv", "text/csv")
+        # Préparation du tableau final pour l'affichage
+        df_final = df[['ID', 'Batiment', 'Date_Format', 'Heure_Finale', 'Type', 'Agent_Attribue']].copy()
+        df_final = df_final.rename(columns={'Date_Format': 'Date', 'Heure_Finale': 'Heure / Suggestion'})
+
+        # 6. Fonction de coloration des lignes
+        def color_agent(row):
+            agent = row['Agent_Attribue']
+            if agent == 'Maria Claret':
+                return ['background-color: #ffdae0'] * len(row) # Rose
+            elif agent == 'Celine':
+                return ['background-color: #d1e9ff'] * len(row) # Bleu
+            elif agent == 'Maria Elisabeth':
+                return ['background-color: #d4f8d4'] * len(row) # Vert
+            return [''] * len(row)
+
+        # 7. Affichage avec Style
+        st.success(f"✅ Planning optimisé pour {len(df_final)} attributions !")
+        
+        # Utilisation de st.table pour que les couleurs soient bien visibles
+        st.table(df_final.style.apply(color_agent, axis=1))
+        
+        # Bouton d'exportation
+        csv = df_final.to_csv(index=False).encode('utf-8-sig')
+        st.download_button("📥 Télécharger le planning final (CSV)", csv, "planning_lausanne.csv", "text/csv")
 
     except Exception as e:
-        st.error(f"Erreur : {e}")
+        st.error(f"Oups, une erreur est survenue : {e}")
