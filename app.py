@@ -10,12 +10,10 @@ AGENTS = ["Maria Claret", "Celine", "Maria Elisabeth"]
 INFOS_BATIMENTS = {
     'Bethusy A': 'Avenue de Béthusy 54',
     'Bethusy B': 'Avenue de Béthusy 56',
-    'Bethusy C': 'Avenue de Béthusy 58',
     'Montolieu A': 'Isabelle-de-Montolieu 90',
     'Montolieu B': 'Isabelle-de-Montolieu 92',
-    'Tunnel': 'Rue du Tunnel 1',
-    'Oron': 'Route de Lausanne 2 (Oron)',
-    'Riponne': 'Place de la Riponne'
+    'Tunnel': 'Rue du Tunnel 17',
+    'Oron': "Route d'Oron 77" # Corrigé pour éviter l'erreur de guillemets
 }
 
 COULEURS = {
@@ -88,6 +86,10 @@ with st.sidebar:
         score = (len(groupements[groupements > 1]) / total * 100) if total > 0 else 0
         st.metric("Taux d'Occupation (Rue)", f"{int(score)}%")
         
+        # Bouton pour extraire les données
+        csv = st.session_state.db.to_csv(index=False).encode('utf-8')
+        st.download_button("📥 Télécharger le planning (CSV)", csv, "planning_export.csv", "text/csv")
+        
         if st.button("🗑️ Reset Planning"):
             st.session_state.db = pd.DataFrame(columns=['Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Type'])
             st.rerun()
@@ -97,13 +99,14 @@ with st.expander("➕ AJOUTER / MODIFIER UN DOSSIER"):
     c1, c2 = st.columns(2)
     with c1:
         n_bat = st.selectbox("Bâtiment", list(INFOS_BATIMENTS.keys()))
-        n_date = st.date_input("Date").strftime('%d/%m/%Y')
+        n_date = st.date_input("Date")
+        date_str = n_date.strftime('%d/%m/%Y')
     with c2:
-        s_agt, s_hr = trouver_meilleur_creneau(n_bat, n_date, st.session_state.db)
+        s_agt, s_hr = trouver_meilleur_creneau(n_bat, date_str, st.session_state.db)
         f_agt = st.selectbox("Agent recommandé", AGENTS, index=AGENTS.index(s_agt))
         f_hr = st.text_input("Heure", value=s_hr)
     if st.button("Enregistrer"):
-        l = {'Batiment': n_bat, 'Date': n_date, 'Heure': f_hr, 'Agent': f_agt, 'Rue': INFOS_BATIMENTS.get(n_bat, "Autre"), 'Type': "Manuel"}
+        l = {'Batiment': n_bat, 'Date': date_str, 'Heure': f_hr, 'Agent': f_agt, 'Rue': INFOS_BATIMENTS.get(n_bat, "Autre"), 'Type': "Manuel"}
         st.session_state.db = pd.concat([st.session_state.db, pd.DataFrame([l])], ignore_index=True)
         st.rerun()
 
