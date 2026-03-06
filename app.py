@@ -17,19 +17,22 @@ COULEURS = {"Celine": "#d1e9ff", "Maria Claret": "#ffdae0", "Maria Elisabeth": "
 
 st.set_page_config(page_title="Unité Logement - Planning Expert v2", layout="wide")
 
+# Initialisation des états
 if 'db' not in st.session_state:
     st.session_state.db = pd.DataFrame(columns=['Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Type', 'Date_Sort'])
 if 'conges' not in st.session_state:
     st.session_state.conges = pd.DataFrame(columns=['Agent', 'Date_Debut', 'Date_Fin'])
 
-# --- FONCTIONS LOGIQUES OPTIMISÉES ---
+# --- FONCTIONS LOGIQUES ---
 
 def est_disponible(agent, date_str):
     if st.session_state.conges.empty: return True
     try:
         dt_cible = pd.to_datetime(date_str, dayfirst=True)
         for _, c in st.session_state.conges[st.session_state.conges['Agent'] == agent].iterrows():
-            if pd.to_datetime(c['Date_Debut'], dayfirst=True) <= dt_cible <= pd.to_datetime(c['Date_Fin'], dayfirst=True): 
+            d_deb = pd.to_datetime(c['Date_Debut'], dayfirst=True)
+            d_fin = pd.to_datetime(c['Date_Fin'], dayfirst=True)
+            if d_deb <= dt_cible <= d_fin: 
                 return False
     except: pass
     return True
@@ -46,16 +49,14 @@ def calculer_creneau_securise(agent, date_str, temp_db, batiment_cible):
 
     try:
         h_obj = datetime.strptime(derniere_h_str, "%H:%M")
-        
-        # OPTIMISATION : Si même adresse, trajet = 5min. Sinon 30min de battement (trajet + marge)
+        # Si même adresse : 65min (visite) / Si adresse différente : 80min (visite + trajet)
         delai = 65 if derniere_rue == rue_cible else 80 
         prochaine_h = h_obj + timedelta(minutes=delai)
         
-        # Gestion Pause déjeuner (12h-13h)
+        # Pause déjeuner (12h-13h)
         if datetime.strptime("12:00", "%H:%M") <= prochaine_h < datetime.strptime("13:00", "%H:%M"):
             prochaine_h = datetime.strptime("13:00", "%H:%M")
             
-        # Sécurité : Pas de RDV débutant après 16h15
         if prochaine_h > datetime.strptime("16:15", "%H:%M"):
             return "COMPLET", False
             
@@ -63,9 +64,10 @@ def calculer_creneau_securise(agent, date_str, temp_db, batiment_cible):
     except:
         return "08:15", True
 
-# --- INTERFACE ---
-st.title("📍 Unité Logement : Planning Optimisé")
-t1, t2, t3 = st.tabs(["📝 Planning Global", "📅 Vue par Agent", "📊 Performance & Trajets"])
+# --- INTERFACE PRINCIPALE ---
+st.title("📍 Unité Logement : Planning & Optimisation")
+
+t1, t2, t3, t4 = st.tabs(["📝 Planning Global", "📅 Vue par Agent", "📊 Performance", "💡 Optimisation"])
 
 with st.sidebar:
     st.header("🌴 Congés / Absences")
@@ -89,26 +91,22 @@ with st.sidebar:
 
         temp = pd.DataFrame(columns=['Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Type', 'Date_Sort'])
         
-        # Tri par date pour une planification séquentielle
         for _, row in df_ex.sort_values(by=[c_date]).iterrows():
             ds = pd.to_datetime(row[c_date]).strftime('%d/%m/%Y')
             rue_demandee = INFOS_BATIMENTS.get(row['Batiment'], "Autre")
-            
             presents = [a for a in AGENTS if est_disponible(a, ds)]
             agt_elu, h_finale = "À définir", "08:15"
             
             if presents:
-                # STRATÉGIE : Calcul d'un score de proximité (0 = déjà sur place, 1 = libre, 2 = ailleurs)
                 scores = {}
                 for p in presents:
                     missions_agent = temp[(temp['Date'] == ds) & (temp['Agent'] == p)]
                     if missions_agent.empty:
-                        scores[p] = 1 # Priorité neutre
+                        scores[p] = 1 
                     else:
                         derniere_loc = missions_agent.iloc[-1]['Rue']
                         scores[p] = 0 if derniere_loc == rue_demandee else 2
                 
-                # Tri : Proximité d'abord, puis équité (nombre de missions déjà affectées)
                 presents_tries = sorted(presents, key=lambda x: (scores[x], len(temp[(temp['Date'] == ds) & (temp['Agent'] == x)])))
                 
                 for p in presents_tries:
@@ -117,7 +115,6 @@ with st.sidebar:
                         agt_elu, h_finale = p, heure_suggere
                         break
             
-            # Forçage manuel de l'heure si spécifiée dans l'Excel
             h_val = str(row[c_heure]).strip()
             if h_val not in ["", "nan", "00:00:00", "libre"]: h_finale = h_val[:5]
 
@@ -134,14 +131,15 @@ with st.sidebar:
         st.session_state.db = pd.DataFrame(columns=['Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Type', 'Date_Sort'])
         st.rerun()
 
-# --- ONGLETS ---
+# --- LOGIQUE DES ONGLETS ---
+
 with t1:
     if not st.session_state.db.empty:
         df_v = st.session_state.db.sort_values(['Date_Sort', 'Heure'])
         st.dataframe(
             df_v[['Date', 'Heure', 'Agent', 'Batiment', 'Type', 'Rue']].style.apply(
                 lambda r: [f'background-color: {COULEURS.get(r["Agent"])}']*6, axis=1
-            ), use_container_width=True, height=600
+            ), use_container_width=True, height=500
         )
 
 with t2:
@@ -159,9 +157,8 @@ with t2:
 
 with t3:
     if not st.session_state.db.empty:
-        st.subheader("📊 Indicateurs d'Optimisation")
+        st.subheader("📊 Statistiques de l'équipe")
         nb_total = len(st.session_state.db)
-        # Un trajet est optimisé si l'agent a 2 missions à la même adresse le même jour
         group_rue = st.session_state.db.groupby(['Date', 'Agent', 'Rue']).size()
         missions_groupees = group_rue[group_rue > 1].sum()
         taux_opti = (missions_groupees / nb_total * 100) if nb_total > 0 else 0
@@ -171,27 +168,56 @@ with t3:
         c2.metric("Missions Groupées", int(missions_groupees))
         c3.metric("Taux d'Optimisation", f"{int(taux_opti)}%")
 
-        st.divider()
-        sel_j_stats = st.selectbox("Détails des déplacements du :", sorted(st.session_state.db['Date'].unique()), key="stats_an")
-        day_d = st.session_state.db[st.session_state.db['Date'] == sel_j_stats]
-        
+with t4:
+    st.subheader("💡 Suggestions d'Optimisation IA")
+    if st.session_state.db.empty:
+        st.info("Importez des données pour analyser les opportunités d'optimisation.")
+    else:
+        df_opti = st.session_state.db.copy()
+        suggestions = []
+
+        # 1. Doublons de déplacements (Plusieurs agents au même endroit)
+        for date in df_opti['Date'].unique():
+            journee = df_opti[df_opti['Date'] == date]
+            for bat, rue in INFOS_BATIMENTS.items():
+                agents_sur_place = journee[journee['Rue'] == rue]['Agent'].unique()
+                agents_sur_place = [a for a in agents_sur_place if a != "À définir"]
+                if len(agents_sur_place) > 1:
+                    suggestions.append({
+                        "Type": "Double Déplacement",
+                        "Priorité": "Haute",
+                        "Détail": f"Le **{date}**, {', '.join(agents_sur_place)} se rendent tous à **{bat}**. Vous pourriez regrouper ces missions."
+                    })
+
+        # 2. Déséquilibre de charge
+        charge = df_opti[df_opti['Agent'] != "À définir"]['Agent'].value_counts()
         for a in AGENTS:
-            agt_d = day_d[day_d['Agent'] == a].sort_values('Heure')
-            if not agt_d.empty:
-                with st.expander(f"Itinéraire de {a}", expanded=True):
-                    # Calcul simplifié des trajets
-                    itin = [BUREAU] + agt_d['Rue'].tolist() + [BUREAU]
-                    t_route = 0
-                    etapes = []
-                    for k in range(len(itin)-1):
-                        if itin[k] != itin[k+1]:
-                            t_route += 20 # Moyenne 20min par trajet différent
-                            etapes.append(f"🚗 Vers {itin[k+1]}")
-                        else:
-                            t_route += 5 # 5min si même bâtiment
-                            etapes.append(f"🚶 Sur place : {itin[k+1]}")
-                    
-                    col_info, col_map = st.columns([1, 2])
-                    col_info.write(f"⏱️ Temps estimé route : **{t_route} min**")
-                    col_info.write(f"📋 Missions : **{len(agt_d)}**")
-                    col_map.write(" > ".join(etapes))
+            if a not in charge: charge[a] = 0
+        
+        if len(charge) > 0 and (charge.max() - charge.min() > 3):
+            suggestions.append({
+                "Type": "Déséquilibre de charge",
+                "Priorité": "Moyenne",
+                "Détail": f"**{charge.idxmax()}** a beaucoup plus de missions ({charge.max()}) que **{charge.idxmin()}** ({charge.min()})."
+            })
+
+        # 3. Missions non attribuées
+        non_attribue = len(df_opti[df_opti['Agent'] == "À définir"])
+        if non_attribue > 0:
+            suggestions.append({
+                "Type": "Missions en attente",
+                "Priorité": "Critique",
+                "Détail": f"Il reste **{non_attribue}** missions sans agent (conflit d'horaire ou absence)."
+            })
+
+        if suggestions:
+            for s in suggestions:
+                if s['Priorité'] == "Haute" or s['Priorité'] == "Critique":
+                    st.error(f"**{s['Type']}** : {s['Détail']}")
+                else:
+                    st.warning(f"**{s['Type']}** : {s['Détail']}")
+        else:
+            st.success("✅ Félicitations ! Votre planning est parfaitement optimisé.")
+
+st.divider()
+st.caption("Système de gestion de planning v2.0 - Unité Logement")
