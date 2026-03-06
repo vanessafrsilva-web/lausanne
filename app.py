@@ -22,7 +22,7 @@ COULEURS = {
     "À définir": "#eeeeee"
 }
 
-st.set_page_config(page_title="Unité Logement - IA Expert", layout="wide")
+st.set_page_config(page_title="Unité Logement - Planning Pro", layout="wide")
 
 # Initialisation
 if 'db' not in st.session_state:
@@ -66,27 +66,23 @@ def trouver_meilleur_creneau(batiment, date_str, temp_db):
         if h_f_a < datetime.strptime("16:00", "%H:%M"): return agt, ajuster_pause(h_f_a).strftime("%H:%M")
     return presents[0], "Surcharge"
 
-# --- TITRE ET ONGLETS (LES DEUX ÉCRANS) ---
+# --- INTERFACE ---
 st.title("📍 Unité Logement : Optimisation Attibutions")
-tab_planning, tab_stats = st.tabs(["📅 Écran 1 : Planning & Saisie", "📊 Écran 2 : Analyse & Performance"])
+tab_plan, tab_cal, tab_stats = st.tabs(["📝 Saisie & Liste", "📅 Vue Calendrier (Outlook)", "📊 Analyses"])
 
-# --- BARRE LATÉRALE (COMMUNE) ---
+# --- SIDEBAR ---
 with st.sidebar:
-    st.header("🌴 Gestion des Absences")
+    st.header("🌴 Congés")
     abs_agent = st.selectbox("Collaboratrice", AGENTS)
     c1, c2 = st.columns(2)
-    with c1: a_deb = st.date_input("Du", key="deb")
-    with c2: a_fin = st.date_input("Au", key="fin")
-    if st.button("Enregistrer absence"):
+    with c1: a_deb = st.date_input("Du")
+    with c2: a_fin = st.date_input("Au")
+    if st.button("Valider absence"):
         st.session_state.conges = pd.concat([st.session_state.conges, pd.DataFrame([{'Agent': abs_agent, 'Date_Debut': a_deb.strftime('%d/%m/%Y'), 'Date_Fin': a_fin.strftime('%d/%m/%Y')}])], ignore_index=True)
     
-    if not st.session_state.conges.empty:
-        st.dataframe(st.session_state.conges, hide_index=True)
-        if st.button("Effacer absences"): st.session_state.conges = pd.DataFrame(columns=['Agent', 'Date_Debut', 'Date_Fin']); st.rerun()
-
     st.divider()
-    st.header("📥 Importation Massive")
-    uploaded = st.file_uploader("Fichier Excel", type=['xlsx'])
+    st.header("📥 Import Excel")
+    uploaded = st.file_uploader("Fichier .xlsx", type=['xlsx'])
     if uploaded and st.button("🚀 Planifier Avril"):
         df_ex = pd.read_excel(uploaded).dropna(how='all').fillna('')
         df_ex.columns = df_ex.columns.str.strip()
@@ -98,54 +94,58 @@ with st.sidebar:
             temp_db = pd.concat([temp_db, pd.DataFrame([{'Batiment': row['Batiment'], 'Date': d_s, 'Heure': hr, 'Agent': agt, 'Rue': INFOS_BATIMENTS.get(row['Batiment'], "Autre"), 'Type': "Import", 'Date_Sort': dt}])], ignore_index=True)
         st.session_state.db = temp_db
         st.rerun()
+    
+    if st.button("🗑️ Reset Général"):
+        st.session_state.db = pd.DataFrame(columns=['Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Type', 'Date_Sort'])
+        st.rerun()
 
-# --- ÉCRAN 1 : PLANNING ---
-with tab_planning:
-    with st.expander("➕ AJOUTER / MODIFIER MANUELLEMENT"):
-        c1, c2 = st.columns(2)
-        with c1:
-            n_bat = st.selectbox("Bâtiment", list(INFOS_BATIMENTS.keys()))
-            n_date = st.date_input("Date")
-        with c2:
-            s_agt, s_hr = trouver_meilleur_creneau(n_bat, n_date.strftime('%d/%m/%Y'), st.session_state.db)
-            f_agt = st.selectbox("Agent", AGENTS, index=AGENTS.index(s_agt) if s_agt in AGENTS else 0)
-            f_hr = st.text_input("Heure", value=s_hr)
-        if st.button("Enregistrer RDV"):
-            st.session_state.db = pd.concat([st.session_state.db, pd.DataFrame([{'Batiment': n_bat, 'Date': n_date.strftime('%d/%m/%Y'), 'Heure': f_hr, 'Agent': f_agt, 'Rue': INFOS_BATIMENTS.get(n_bat, "Autre"), 'Type': "Manuel", 'Date_Sort': pd.to_datetime(n_date)}])], ignore_index=True)
-            st.rerun()
-
+# --- TAB 1 : LISTE ---
+with tab_plan:
+    st.subheader("📋 Liste des missions")
     if not st.session_state.db.empty:
-        st.subheader("🔍 Filtres rapides")
-        f1, f2, f3 = st.columns(3)
-        with f1: sel_d = st.selectbox("Par Date", ["Tout"] + sorted(st.session_state.db['Date'].unique().tolist()))
-        with f2: sel_a = st.selectbox("Par Agent", ["Tout"] + AGENTS)
-        with f3: sel_b = st.selectbox("Par Bâtiment", ["Tout"] + sorted(st.session_state.db['Batiment'].unique().tolist()))
-        
-        df_v = st.session_state.db.copy()
-        if sel_d != "Tout": df_v = df_v[df_v['Date'] == sel_d]
-        if sel_a != "Tout": df_v = df_v[df_v['Agent'] == sel_agent]
-        if sel_b != "Tout": df_v = df_v[df_v['Batiment'] == sel_bat]
+        df_v = st.session_state.db.sort_values(by=['Date_Sort', 'Heure'])
+        st.table(df_v[['Date', 'Heure', 'Agent', 'Batiment', 'Rue']].style.apply(lambda r: [f'background-color: {COULEURS.get(r["Agent"])}']*len(r), axis=1))
 
-        st.table(df_v.sort_values(by=['Date_Sort', 'Heure']).style.apply(lambda r: [f'background-color: {COULEURS.get(r["Agent"])}']*len(r), axis=1))
-
-# --- ÉCRAN 2 : STATISTIQUES ---
-with tab_stats:
-    st.subheader("📊 Tableau de Bord Mensuel")
+# --- TAB 2 : CALENDRIER (TYPE OUTLOOK) ---
+with tab_cal:
+    st.subheader("📅 Vue Planning Journalière")
     if not st.session_state.db.empty:
-        c1, c2, c3 = st.columns(3)
-        nb_dos = len(st.session_state.db)
-        grp = st.session_state.db.groupby(['Date', 'Rue']).size()
-        taux = (len(grp[grp > 1]) / nb_dos * 100) if nb_dos > 0 else 0
+        # Choix du jour à afficher
+        jours_dispos = sorted(st.session_state.db['Date'].unique())
+        jour_selectionne = st.selectbox("Choisir une date à visualiser :", jours_dispos)
         
-        c1.metric("Dossiers Total", nb_dos)
-        c2.metric("Taux Optimisation", f"{int(taux)}%")
-        c3.metric("Missions / Jour (Moy)", round(nb_dos / len(st.session_state.db['Date'].unique()), 1))
-
-        st.divider()
-        st.write("### ⚖️ Répartition de la charge (Nb de dossiers)")
-        st.bar_chart(st.session_state.db['Agent'].value_counts())
+        st.write(f"### 🗓️ Détails du {jour_selectionne}")
         
-        st.write("### 📍 Zones les plus actives")
-        st.dataframe(st.session_state.db.groupby('Rue').size().sort_values(ascending=False), use_container_width=True)
+        # Création de 3 colonnes (une par agent)
+        cols = st.columns(3)
+        
+        for i, agent in enumerate(AGENTS):
+            with cols[i]:
+                st.markdown(f"<div style='text-align:center; background-color:{COULEURS[agent]}; padding:10px; border-radius:5px; font-weight:bold; color: black;'>{agent}</div>", unsafe_allow_html=True)
+                
+                # Missions de l'agent ce jour-là
+                missions_du_jour = st.session_state.db[(st.session_state.db['Date'] == jour_selectionne) & (st.session_state.db['Agent'] == agent)]
+                missions_du_jour = missions_du_jour.sort_values(by='Heure')
+                
+                if missions_du_jour.empty:
+                    st.info("Aucune mission")
+                else:
+                    for _, row in missions_du_jour.iterrows():
+                        # Affichage style "Bloc Calendrier"
+                        st.markdown(f"""
+                        <div style='border-left: 5px solid gray; background-color: #f9f9f9; padding: 10px; margin-top: 10px; border-radius: 3px; color: black;'>
+                            <b style='color: #333;'>{row['Heure']}</b><br>
+                            🏢 {row['Batiment']}<br>
+                            📍 {row['Rue']}
+                        </div>
+                        """, unsafe_allow_html=True)
     else:
-        st.info("Importez vos 30 dossiers pour voir les analyses ici.")
+        st.info("Importez des données pour afficher le calendrier.")
+
+# --- TAB 3 : ANALYSES ---
+with tab_stats:
+    st.subheader("📊 Performance")
+    if not st.session_state.db.empty:
+        nb = len(st.session_state.db)
+        st.metric("Total Missions", nb)
+        st.bar_chart(st.session_state.db['Agent'].value_counts())
