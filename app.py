@@ -2,121 +2,110 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 
-# --- CONFIGURATION FIXE ---
-BUREAU = "Mon Paisible 18"
+# --- CONFIGURATION DES RÉFÉRENCES ---
+BUREAU = "Mon Paisible 18, 1007 Lausanne"
 AGENTS = ["Maria Claret", "Celine", "Maria Elisabeth"]
 ZONES = {
-    'Bethusy A': 'Chailly', 'Bethusy B': 'Chailly',
+    'Bethusy A': 'Chailly', 'Bethusy B': 'Chailly', 'Bethusy C': 'Chailly',
     'Montolieu A': 'Montolieu', 'Montolieu B': 'Montolieu',
-    'Tunnel': 'Riponne', 'Oron': 'Oron'
+    'Tunnel': 'Riponne', 'Oron': 'Oron', 'Riponne': 'Riponne'
 }
 
-st.set_page_config(page_title="Planificateur Expert - Unité Logement", layout="wide")
+st.set_page_config(page_title="Expert Planning - Unité Logement", layout="wide")
 
-# --- STYLE PERSONNALISÉ ---
-st.markdown("""
-    <style>
-    .reportview-container { background: #f0f2f6; }
-    .stMetric { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-    </style>
-    """, unsafe_allow_html=True)
-
-st.title("🚀 Assistant de Planification Intelligent")
-st.write(f"Gestion des 30 attributions mensuelles - Départ : **{BUREAU}**")
-
-# --- 1. BASE DE DONNÉES (Simulation de la mémoire de l'outil) ---
+# Initialisation de la base de données interne
 if 'db' not in st.session_state:
-    st.session_state.db = pd.DataFrame(columns=['Batiment', 'Date', 'Heure', 'Agent', 'Zone'])
+    st.session_state.db = pd.DataFrame(columns=['ID', 'Batiment', 'Date', 'Heure', 'Agent', 'Zone', 'Type'])
 
-# --- 2. FORMULAIRE D'AIDE À LA DÉCISION ---
-with st.expander("➕ PLANIFIER UNE NOUVELLE ATTRIBUTION", expanded=True):
+st.title("📍 Planificateur Intelligent : Unité Logement")
+st.write(f"Gestion hybride des attributions - Départ : **{BUREAU}**")
+
+# --- SECTION 1 : IMPORTATION MASSIVE (LES 30 DOSSIERS) ---
+with st.sidebar:
+    st.header("📥 Importation Excel")
+    uploaded_file = st.file_uploader("Charger le fichier du mois", type=['xlsx'])
+    
+    if uploaded_file:
+        if st.button("🚀 Fusionner les données Excel"):
+            df_excel = pd.read_excel(uploaded_file).dropna(how='all').fillna('')
+            df_excel.columns = df_excel.columns.str.strip()
+            
+            # Détection de la colonne date
+            col_date = next((c for c in df_excel.columns if 'date' in c.lower()), 'Date')
+            
+            # Transformation pour la base de données
+            new_data = pd.DataFrame({
+                'ID': df_excel['ID'] if 'ID' in df_excel.columns else range(len(df_excel)),
+                'Batiment': df_excel['Batiment'],
+                'Date': pd.to_datetime(df_excel[col_date]).dt.strftime('%d/%m/%Y'),
+                'Heure': df_excel['Heure'].astype(str),
+                'Agent': "À définir",
+                'Zone': df_excel['Batiment'].map(ZONES).fillna('Autre'),
+                'Type': df_excel['Type'] if 'Type' in df_excel.columns else "Attribution"
+            })
+            
+            st.session_state.db = pd.concat([st.session_state.db, new_data]).drop_duplicates().reset_index(drop=True)
+            st.success(f"{len(new_data)} dossiers importés !")
+
+# --- SECTION 2 : AJOUT MANUEL ET SUGGESTIONS ---
+with st.expander("➕ AJOUTER OU MODIFIER UN DOSSIER MANUELLEMENT"):
     col1, col2, col3 = st.columns(3)
-    
     with col1:
-        nouveau_bat = st.selectbox("Bâtiment concerné :", list(ZONES.keys()))
-        zone_cible = ZONES[nouveau_bat]
-    
+        n_bat = st.selectbox("Bâtiment", list(ZONES.keys()))
+        n_date = st.date_input("Date", value=datetime.now())
     with col2:
-        date_souhaitee = st.date_input("Date prévue :")
-        date_str = date_souhaitee.strftime('%d/%m/%Y')
-
-    # --- LE MOTEUR DE SUGGESTION (L'intelligence de l'IA) ---
-    missions_jour = st.session_state.db[st.session_state.db['Date'] == date_str]
-    
-    # Analyse des opportunités
-    suggestions = []
-    if not missions_jour.empty:
-        # Existe-t-il déjà quelqu'un dans cette zone ce jour-là ?
-        meme_zone = missions_jour[missions_jour['Zone'] == zone_cible]
-        if not meme_zone.empty:
-            for _, row in meme_zone.iterrows():
-                suggestions.append(f"✨ OPTIMAL : {row['Agent']} est déjà à {zone_cible}. Groupez avec elle !")
-    
+        n_heure = st.text_input("Heure (ex: 10:30)", value="Libre")
+        n_agent = st.selectbox("Collaboratrice", AGENTS)
     with col3:
-        if suggestions:
-            for s in suggestions: st.success(s)
-        else:
-            st.info("ℹ️ Aucune mission dans cette zone ce jour-là.")
+        n_type = st.selectbox("Type", ["Entrée", "Sortie", "Visite"])
+        
+    # Intelligence de regroupement
+    date_str = n_date.strftime('%d/%m/%Y')
+    zone_actuelle = ZONES.get(n_bat, "Autre")
+    voisins = st.session_state.db[(st.session_state.db['Date'] == date_str) & (st.session_state.db['Zone'] == zone_actuelle)]
+    
+    if not voisins.empty:
+        st.info(f"💡 **Conseil Performance :** {len(voisins)} dossier(s) déjà prévus à {zone_actuelle} ce jour-là. Privilégiez ce créneau !")
 
-    # Choix final par la collaboratrice
-    c_agt, c_hr = st.columns(2)
-    with c_agt: agent_choisi = st.selectbox("Attribuer à :", AGENTS)
-    with c_hr: heure_choisie = st.time_input("Heure du RDV :", datetime.strptime("08:00", "%H:%M"))
-
-    if st.button("✅ Valider et Ajouter au Planning"):
-        nouvelle_ligne = {
-            'Batiment': nouveau_bat, 
-            'Date': date_str, 
-            'Heure': heure_choisie.strftime('%H:%M'), 
-            'Agent': agent_choisi, 
-            'Zone': zone_cible
-        }
+    if st.button("💾 Enregistrer la modification"):
+        nouvelle_ligne = {'ID': 'Manuel', 'Batiment': n_bat, 'Date': date_str, 'Heure': n_heure, 'Agent': n_agent, 'Zone': zone_actuelle, 'Type': n_type}
         st.session_state.db = pd.concat([st.session_state.db, pd.DataFrame([nouvelle_ligne])], ignore_index=True)
-        st.balloons()
+        st.rerun()
 
-# --- 3. VISION GLOBALE DES 30 DOSSIERS ---
+# --- SECTION 3 : AFFICHAGE ET OPTIMISATION ---
 st.divider()
-st.subheader("📅 Tableau de Bord du Mois")
-
 if not st.session_state.db.empty:
-    # Tri intelligent
-    df_tri = st.session_state.db.sort_values(by=['Date', 'Agent', 'Heure'])
+    # Filtres d'affichage
+    f_date = st.selectbox("Filtrer par jour :", ["Toutes les dates"] + sorted(st.session_state.db['Date'].unique().tolist()))
     
-    # Filtre par agent pour les collaboratrices
-    view_agt = st.multiselect("Filtrer par collaboratrice :", AGENTS, default=AGENTS)
-    df_filtered = df_tri[df_tri['Agent'].isin(view_agt)]
+    df_view = st.session_state.db.copy()
+    if f_date != "Toutes les dates":
+        df_view = df_view[df_view['Date'] == f_date]
     
-    # Affichage stylisé
-    def color_agent(val):
-        if val == 'Maria Claret': return 'background-color: #ffdae0'
-        if val == 'Celine': return 'background-color: #d1e9ff'
-        if val == 'Maria Elisabeth': return 'background-color: #d4f8d4'
-        return ''
+    # Tri par Agent et Heure
+    df_view = df_view.sort_values(by=['Agent', 'Heure'])
 
-    st.table(df_filtered.style.applymap(color_agent, subset=['Agent']))
+    # Style des lignes par collaboratrice
+    def style_rows(row):
+        color = '#ffdae0' if row['Agent'] == 'Maria Claret' else '#d1e9ff' if row['Agent'] == 'Celine' else '#d4f8d4'
+        if row['Agent'] == "À définir": color = '#eeeeee'
+        return [f'background-color: {color}'] * len(row)
 
-    # --- 4. ANALYSE DE PERFORMANCE ---
-    st.subheader("📊 Analyse de l'Optimisation")
-    c1, c2, c3 = st.columns(3)
-    
-    # Calcul de la charge
-    total_missions = len(st.session_state.db)
-    c1.metric("Dossiers Planifiés", f"{total_missions} / 30")
-    
-    # Calcul des regroupements (Performance)
-    groupements = st.session_state.db.groupby(['Date', 'Zone']).size()
-    succes_groupes = len(groupements[groupements > 1])
-    c2.metric("Regroupements réussis", succes_groupes, help="Nombre de fois où plusieurs missions sont dans la même zone le même jour.")
-    
-    # Alerte Surcharge
-    surcharge = st.session_state.db.groupby(['Date', 'Agent']).size()
-    jours_critiques = len(surcharge[surcharge > 4])
-    c3.metric("Alertes Surcharge", jours_critiques, delta_color="inverse", delta="Jours > 4 rdv")
+    st.subheader(f"Planning : {f_date}")
+    st.table(df_view.style.apply(style_rows, axis=1))
 
+    # --- INDICATEURS DE PERFORMANCE ---
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("📊 Score du Mois")
+    total = len(st.session_state.db)
+    regroupes = st.session_state.db.groupby(['Date', 'Zone']).size()
+    score_opti = (len(regroupes[regroupes > 1]) / total * 100) if total > 0 else 0
+    
+    st.sidebar.metric("Dossiers totaux", total)
+    st.sidebar.metric("Taux de regroupement", f"{int(score_opti)}%", help="Plus ce score est haut, moins vos collaboratrices passent de temps sur la route.")
+
+    if st.sidebar.button("🗑️ Vider tout le planning"):
+        st.session_state.db = pd.DataFrame(columns=['ID', 'Batiment', 'Date', 'Heure', 'Agent', 'Zone', 'Type'])
+        st.rerun()
 else:
-    st.info("Le planning est vide. Commencez à ajouter des dossiers ci-dessus.")
-
-# --- BOUTON DE SAUVEGARDE ---
-if st.sidebar.button("💾 Sauvegarder le planning (CSV)"):
-    csv = st.session_state.db.to_csv(index=False)
-    st.sidebar.download_button("⬇️ Télécharger", csv, "planning_avril.csv", "text/csv")
+    st.info("Aucun dossier pour le moment. Importez votre fichier Excel ou ajoutez un dossier manuellement.")
