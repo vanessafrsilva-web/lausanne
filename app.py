@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 
 # --- CONFIGURATION FIXE ---
-BUREAU = "18 Mon Repos" # Mis à jour selon vos informations
+BUREAU = "18 Mon Repos"
 AGENTS = ["Celine", "Maria Claret", "Maria Elisabeth"]
 
 INFOS_BATIMENTS = {
@@ -24,20 +24,25 @@ COULEURS = {
 
 st.set_page_config(page_title="Unité Logement", layout="wide")
 
-# Initialisation des bases de données dans la session
 if 'db' not in st.session_state:
     st.session_state.db = pd.DataFrame(columns=['Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Type', 'Date_Sort'])
 if 'conges' not in st.session_state:
-    st.session_state.conges = pd.DataFrame(columns=['Agent', 'Date'])
+    st.session_state.conges = pd.DataFrame(columns=['Agent', 'Date_Debut', 'Date_Fin'])
 
 # --- FONCTION DE VÉRIFICATION DE DISPONIBILITÉ ---
-def est_disponible(agent, date_str):
+def est_disponible(agent, date_cible_str):
     if st.session_state.conges.empty:
         return True
-    # Vérifie si l'agent a un congé enregistré à cette date
-    match = st.session_state.conges[(st.session_state.conges['Agent'] == agent) & 
-                                    (st.session_state.conges['Date'] == date_str)]
-    return match.empty
+    
+    date_cible = pd.to_datetime(date_cible_str, dayfirst=True)
+    
+    # On vérifie si la date cible tombe dans une des plages de congés de l'agent
+    for _, conge in st.session_state.conges[st.session_state.conges['Agent'] == agent].iterrows():
+        debut = pd.to_datetime(conge['Date_Debut'], dayfirst=True)
+        fin = pd.to_datetime(conge['Date_Fin'], dayfirst=True)
+        if debut <= date_cible <= fin:
+            return False
+    return True
 
 # --- MOTEUR D'ATTRIBUTION AVEC FILTRE ABSENCES ---
 def trouver_meilleur_creneau(batiment, date_str, temp_db):
@@ -51,7 +56,7 @@ def trouver_meilleur_creneau(batiment, date_str, temp_db):
             return pause_fin
         return heure_fin_mission
 
-    # Liste des agents réellement présents ce jour-là
+    # Liste des agents réellement présents
     agents_presents = [a for a in AGENTS if est_disponible(a, date_str)]
     
     if not agents_presents:
@@ -59,7 +64,6 @@ def trouver_meilleur_creneau(batiment, date_str, temp_db):
 
     # PRIORITÉ 1 : CELINE (si présente)
     if "Celine" in agents_presents:
-        # Même rue ?
         celine_meme_rue = missions_jour[(missions_jour['Agent'] == "Celine") & (missions_jour['Rue'] == rue_cible)]
         if not celine_meme_rue.empty:
             dernier = celine_meme_rue.sort_values(by='Heure').iloc[-1]
@@ -67,7 +71,6 @@ def trouver_meilleur_creneau(batiment, date_str, temp_db):
             h_fin = ajuster_pause(h_fin)
             return "Celine", h_fin.strftime("%H:%M")
 
-        # Sinon, selon son heure de fin
         missions_celine = missions_jour[missions_jour['Agent'] == "Celine"]
         if missions_celine.empty:
             return "Celine", "08:15"
@@ -77,9 +80,8 @@ def trouver_meilleur_creneau(batiment, date_str, temp_db):
             if h_fin_celine < datetime.strptime("15:30", "%H:%M"):
                 return "Celine", h_fin_celine.strftime("%H:%M")
 
-    # PRIORITÉ 2 : SURPLUS (Maria Claret ou Elisabeth si présentes)
-    surplus_presents = [a for a in ["Maria Claret", "Maria Elisabeth"] if a in agents_presents]
-    for agent_surplus in surplus_presents:
+    # PRIORITÉ 2 : MARIA CLARET / ELISABETH
+    for agent_surplus in [a for a in ["Maria Claret", "Maria Elisabeth"] if a in agents_presents]:
         missions_agt = missions_jour[missions_jour['Agent'] == agent_surplus]
         if missions_agt.empty:
             return agent_surplus, "08:15"
@@ -91,24 +93,31 @@ def trouver_meilleur_creneau(batiment, date_str, temp_db):
 
     return agents_presents[0], "Surcharge"
 
-# TITRE FIXE
 st.title("📍 Unité Logement : Optimisation Attibutions")
 
-# --- BARRE LATÉRALE ---
+# --- BARRE LATÉRALE : CONGÉS AVEC DATE DE FIN ---
 with st.sidebar:
     st.header("🌴 Gestion des Absences")
-    abs_agent = st.selectbox("Collaboratrice absente", AGENTS)
-    abs_date = st.date_input("Date de l'absence")
+    abs_agent = st.selectbox("Collaboratrice", AGENTS)
+    c_abs1, c_abs2 = st.columns(2)
+    with c_abs1:
+        abs_debut = st.date_input("Du", key="debut")
+    with c_abs2:
+        abs_fin = st.date_input("Au", key="fin")
+    
     if st.button("Enregistrer l'absence"):
-        nouvel_abs = pd.DataFrame([{'Agent': abs_agent, 'Date': abs_date.strftime('%d/%m/%Y')}])
+        nouvel_abs = pd.DataFrame([{
+            'Agent': abs_agent, 
+            'Date_Debut': abs_debut.strftime('%d/%m/%Y'),
+            'Date_Fin': abs_fin.strftime('%d/%m/%Y')
+        }])
         st.session_state.conges = pd.concat([st.session_state.conges, nouvel_abs], ignore_index=True)
-        st.success(f"Absence de {abs_agent} enregistrée")
+        st.success(f"Absence enregistrée pour {abs_agent}")
     
     if not st.session_state.conges.empty:
-        st.write("Absences prévues :")
         st.dataframe(st.session_state.conges, hide_index=True)
         if st.button("Effacer les absences"):
-            st.session_state.conges = pd.DataFrame(columns=['Agent', 'Date'])
+            st.session_state.conges = pd.DataFrame(columns=['Agent', 'Date_Debut', 'Date_Fin'])
             st.rerun()
 
     st.divider()
@@ -119,7 +128,9 @@ with st.sidebar:
         df_ex.columns = df_ex.columns.str.strip()
         col_d = next((c for c in df_ex.columns if 'date' in c.lower()), 'Date')
         
-        temp_db = st.session_state.db.copy()
+        # RESET DU PLANNING AVANT IMPORT POUR ÉVITER LES DOUBLONS SI ON RE-TESTE
+        temp_db = pd.DataFrame(columns=['Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Type', 'Date_Sort'])
+        
         for _, row in df_ex.sort_values(by=[col_d, 'Batiment']).iterrows():
             date_dt = pd.to_datetime(row[col_d])
             d_str = date_dt.strftime('%d/%m/%Y')
@@ -131,7 +142,7 @@ with st.sidebar:
                 'Type': "Import", 'Date_Sort': date_dt
             }])], ignore_index=True)
         st.session_state.db = temp_db
-        st.success("Planning optimisé !")
+        st.success("Planning recalculé en fonction des absences !")
 
 # --- FORMULAIRE MANUEL ---
 with st.expander("➕ AJOUTER / MODIFIER UN DOSSIER"):
@@ -142,7 +153,6 @@ with st.expander("➕ AJOUTER / MODIFIER UN DOSSIER"):
         date_str = n_date.strftime('%d/%m/%Y')
     with c2:
         s_agt, s_hr = trouver_meilleur_creneau(n_bat, date_str, st.session_state.db)
-        # On ajuste l'index pour Streamlit si l'agent recommandé est absent
         idx_reco = AGENTS.index(s_agt) if s_agt in AGENTS else 0
         f_agt = st.selectbox("Agent recommandé", AGENTS, index=idx_reco)
         f_hr = st.text_input("Heure", value=s_hr)
