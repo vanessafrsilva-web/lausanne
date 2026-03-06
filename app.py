@@ -54,14 +54,14 @@ def trouver_meilleur_creneau(batiment, date_str, temp_db):
         h_fin = datetime.strptime(missions_agt.sort_values(by='Heure').iloc[-1]['Heure'], "%H:%M") + timedelta(hours=1, minutes=45)
         return agent_libre, h_fin.strftime("%H:%M")
 
-st.title("🚀 IA Planning : Focus Rue & Adresses")
+st.title("🚀 Planning Attibutions Logement : Optimisation")
 
 # --- BARRE LATÉRALE ---
 with st.sidebar:
     st.header("📥 Importation Massive")
-    uploaded = st.file_uploader("Fichier Excel (30 dossiers)", type=['xlsx'])
+    uploaded = st.file_uploader("Fichier Excel", type=['xlsx'])
     
-    if uploaded and st.button("🚀 Planifier Avril par Rue"):
+    if uploaded and st.button("🚀 Planification du mois"):
         df_ex = pd.read_excel(uploaded).dropna(how='all').fillna('')
         df_ex.columns = df_ex.columns.str.strip()
         col_d = next((c for c in df_ex.columns if 'date' in c.lower()), 'Date')
