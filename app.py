@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 
-# --- CONFIGURATION FIXE (MISE À JOUR) ---
+# --- CONFIGURATION FIXE ---
 BUREAU = "Chemin Mont Paisible 18, 1011 Lausanne"
 AGENTS = ["Celine", "Maria Claret", "Maria Elisabeth"]
 
@@ -12,19 +12,13 @@ INFOS_BATIMENTS = {
     'Montolieu A': 'Isabelle-de-Montolieu 90, Lausanne',
     'Montolieu B': 'Isabelle-de-Montolieu 92, Lausanne',
     'Tunnel': 'Rue du Tunnel 17, Lausanne',
-    'Oron': "Route d'Oron 77, 1010 Lausanne" # Correction effectuée ici
+    'Oron': "Route d'Oron 77, 1010 Lausanne"
 }
 
-COULEURS = {
-    "Celine": "#d1e9ff",
-    "Maria Claret": "#ffdae0",
-    "Maria Elisabeth": "#d4f8d4",
-    "À définir": "#eeeeee"
-}
+COULEURS = {"Celine": "#d1e9ff", "Maria Claret": "#ffdae0", "Maria Elisabeth": "#d4f8d4", "À définir": "#eeeeee"}
 
 st.set_page_config(page_title="Unité Logement - Expert", layout="wide")
 
-# Initialisation
 if 'db' not in st.session_state:
     st.session_state.db = pd.DataFrame(columns=['Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Date_Sort'])
 if 'conges' not in st.session_state:
@@ -45,27 +39,18 @@ def est_disponible(agent, date_str):
 
 def calculer_prochain_creneau(agent, date_str, temp_db):
     m_jour = temp_db[(temp_db['Date'] == date_str) & (temp_db['Agent'] == agent)]
-    if m_jour.empty:
-        return "08:15"
-    
-    # On nettoie le marqueur (*) pour le calcul mathématique
+    if m_jour.empty: return "08:15"
     derniere_h_str = str(m_jour.iloc[-1]['Heure']).replace("(*)", "").strip()
     try:
         heure_obj = datetime.strptime(derniere_h_str, "%H:%M")
-        # 1h entretien + 15 min trajet moyen
         prochaine_h = heure_obj + timedelta(hours=1, minutes=15)
-        
-        # Gestion pause (12h-13h)
         if datetime.strptime("12:00", "%H:%M") <= prochaine_h < datetime.strptime("13:00", "%H:%M"):
             prochaine_h = datetime.strptime("13:00", "%H:%M")
-            
         return prochaine_h.strftime("%H:%M")
-    except:
-        return "08:15"
+    except: return "08:15"
 
 # --- INTERFACE ---
-
-st.title("📍 Unité Logement : Optimisation & Analyses")
+st.title("📍 Unité Logement : Planification Équilibrée")
 tab_plan, tab_cal, tab_stats = st.tabs(["📝 Planning", "📅 Calendrier", "📊 Analyses"])
 
 with st.sidebar:
@@ -90,24 +75,34 @@ with st.sidebar:
         
         temp = pd.DataFrame(columns=['Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Date_Sort'])
         
+        # On trie par date pour traiter jour après jour
         for _, row in df_ex.sort_values(by=[c_date]).iterrows():
             dt = pd.to_datetime(row[c_date])
             ds = dt.strftime('%d/%m/%Y')
             
-            agt = "À définir"
-            for a in AGENTS:
-                if est_disponible(a, ds):
-                    agt = a
-                    break
+            # --- LOGIQUE D'ÉQUILIBRAGE ---
+            # On cherche qui est dispo ET qui a le moins de dossiers ce jour-là
+            agents_possibles = [a for a in AGENTS if est_disponible(a, ds)]
+            
+            if not agents_possibles:
+                agent_elu = "À définir"
+            else:
+                # On compte combien de dossiers chaque agent a déjà ce jour-là dans 'temp'
+                charges = {}
+                for a in agents_possibles:
+                    charges[a] = len(temp[(temp['Date'] == ds) & (temp['Agent'] == a)])
+                
+                # On choisit celui qui a la charge minimale
+                agent_elu = min(charges, key=charges.get)
             
             h_val = str(row[c_heure]).strip()
             if h_val in ["", "nan", "00:00:00", "libre"]:
-                h_final = f"{calculer_prochain_creneau(agt, ds, temp)} (*)"
+                h_final = f"{calculer_prochain_creneau(agent_elu, ds, temp)} (*)"
             else:
                 h_final = h_val[:5]
             
             temp = pd.concat([temp, pd.DataFrame([{
-                'Batiment': row[c_bat], 'Date': ds, 'Heure': h_final, 'Agent': agt,
+                'Batiment': row[c_bat], 'Date': ds, 'Heure': h_final, 'Agent': agent_elu,
                 'Rue': INFOS_BATIMENTS.get(row[c_bat], "Autre"), 'Date_Sort': dt
             }])], ignore_index=True)
         st.session_state.db = temp
@@ -118,7 +113,6 @@ with st.sidebar:
         st.rerun()
 
 # --- ONGLETS ---
-
 with tab_plan:
     if not st.session_state.db.empty:
         df_v = st.session_state.db.sort_values(by=['Date_Sort', 'Heure'])
@@ -126,8 +120,7 @@ with tab_plan:
 
 with tab_cal:
     if not st.session_state.db.empty:
-        jours = sorted(st.session_state.db['Date'].unique())
-        sel_j = st.selectbox("Journée du :", jours)
+        sel_j = st.selectbox("Journée du :", sorted(st.session_state.db['Date'].unique()))
         cols = st.columns(3)
         for i, a in enumerate(AGENTS):
             with cols[i]:
@@ -140,25 +133,14 @@ with tab_cal:
 with tab_stats:
     if not st.session_state.db.empty:
         st.subheader("📊 Analyses de Charge")
-        c1, c2 = st.columns(2)
-        total = len(st.session_state.db)
-        c1.metric("Total Missions", total)
-        c2.metric("Travail Terrain", f"{total}h00")
+        # Graphique de répartition pour vérifier l'équité
+        st.bar_chart(st.session_state.db['Agent'].value_counts())
         
-        st.divider()
-        sel_j_an = st.selectbox("Calcul trajets pour le :", sorted(st.session_state.db['Date'].unique()), key="an")
+        sel_j_an = st.selectbox("Trajets du :", sorted(st.session_state.db['Date'].unique()), key="an")
         day_d = st.session_state.db[st.session_state.db['Date'] == sel_j_an]
-        
         for a in AGENTS:
             agt_d = day_d[day_d['Agent'] == a].sort_values(by='Heure')
             if not agt_d.empty:
-                st.write(f"#### 👩‍💻 {a}")
                 itin = [BUREAU] + agt_d['Rue'].tolist() + [BUREAU]
-                t_route = 0
-                for k in range(len(itin)-1):
-                    dep, arr = itin[k], itin[k+1]
-                    dur = 5 if dep == arr else 15 # Oron étant à Lausanne, le trajet est standard
-                    t_route += dur
-                    st.write(f"🚗 {dep.split(',')[0]} ➡️ {arr.split(',')[0]} ({dur} min)")
-                st.success(f"**Total :** {len(agt_d)}h Terrain | {t_route} min Route")
-                st.divider()
+                t_route = sum([5 if itin[k] == itin[k+1] else 15 for k in range(len(itin)-1)])
+                st.write(f"👩‍💻 **{a}** : {len(agt_d)}h Terrain | {t_route} min Route")
