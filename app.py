@@ -2,129 +2,121 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 
-# 1. Configuration des Zones et Adresses pour trajet réel
-# Lausanne (Centre) <-> Oron = ~30 min | Inter-Lausanne = ~15 min
+# --- CONFIGURATION FIXE ---
+BUREAU = "Mon Paisible 18"
+AGENTS = ["Maria Claret", "Celine", "Maria Elisabeth"]
 ZONES = {
     'Bethusy A': 'Chailly', 'Bethusy B': 'Chailly',
     'Montolieu A': 'Montolieu', 'Montolieu B': 'Montolieu',
-    'Montelieu A': 'Montolieu', 'Montelieu B': 'Montolieu',
     'Tunnel': 'Riponne', 'Oron': 'Oron'
 }
 
-def calculer_temps_trajet(zone_dep, zone_arr):
-    if zone_dep == zone_arr:
-        return 10  # 10 min de battement si on reste dans le même bâtiment/quartier
-    if "Oron" in [zone_dep, zone_arr]:
-        return 35  # 35 min pour aller ou revenir d'Oron
-    return 20      # 20 min pour circuler entre deux zones de Lausanne
+st.set_page_config(page_title="Planificateur Expert - Unité Logement", layout="wide")
 
-st.set_page_config(page_title="Planning Lausanne Pro - Expert", layout="wide")
-st.title("📍 Planning : Unité Logement (Performance & Trajets)")
+# --- STYLE PERSONNALISÉ ---
+st.markdown("""
+    <style>
+    .reportview-container { background: #f0f2f6; }
+    .stMetric { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    </style>
+    """, unsafe_allow_html=True)
 
-# --- BARRE LATÉRALE ---
-st.sidebar.header("⚙️ Configuration")
-check_mc = st.sidebar.checkbox("Maria Claret", value=True)
-check_ce = st.sidebar.checkbox("Celine", value=True)
-check_me = st.sidebar.checkbox("Maria Elisabeth", value=True)
+st.title("🚀 Assistant de Planification Intelligent")
+st.write(f"Gestion des 30 attributions mensuelles - Départ : **{BUREAU}**")
 
-agents_actifs = []
-if check_mc: agents_actifs.append("Maria Claret")
-if check_ce: agents_actifs.append("Celine")
-if check_me: agents_actifs.append("Maria Elisabeth")
+# --- 1. BASE DE DONNÉES (Simulation de la mémoire de l'outil) ---
+if 'db' not in st.session_state:
+    st.session_state.db = pd.DataFrame(columns=['Batiment', 'Date', 'Heure', 'Agent', 'Zone'])
 
-uploaded_file = st.file_uploader("Étape 1 : Glissez votre fichier Excel ici", type=['csv', 'xlsx'])
+# --- 2. FORMULAIRE D'AIDE À LA DÉCISION ---
+with st.expander("➕ PLANIFIER UNE NOUVELLE ATTRIBUTION", expanded=True):
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        nouveau_bat = st.selectbox("Bâtiment concerné :", list(ZONES.keys()))
+        zone_cible = ZONES[nouveau_bat]
+    
+    with col2:
+        date_souhaitee = st.date_input("Date prévue :")
+        date_str = date_souhaitee.strftime('%d/%m/%Y')
 
-if uploaded_file and agents_actifs:
-    try:
-        # Lecture et nettoyage des noms de colonnes
-        df = pd.read_csv(uploaded_file) if uploaded_file.name.endswith('.csv') else pd.read_excel(uploaded_file)
-        df.columns = df.columns.str.strip()
-        df = df.dropna(how='all').fillna('')
-
-        # Détection automatique de la colonne Date
-        col_date = next((c for c in df.columns if 'date' in c.lower()), None)
-        
-        if not col_date:
-            st.error("⚠️ La colonne 'Date' est introuvable. Vérifiez votre fichier Excel.")
+    # --- LE MOTEUR DE SUGGESTION (L'intelligence de l'IA) ---
+    missions_jour = st.session_state.db[st.session_state.db['Date'] == date_str]
+    
+    # Analyse des opportunités
+    suggestions = []
+    if not missions_jour.empty:
+        # Existe-t-il déjà quelqu'un dans cette zone ce jour-là ?
+        meme_zone = missions_jour[missions_jour['Zone'] == zone_cible]
+        if not meme_zone.empty:
+            for _, row in meme_zone.iterrows():
+                suggestions.append(f"✨ OPTIMAL : {row['Agent']} est déjà à {zone_cible}. Groupez avec elle !")
+    
+    with col3:
+        if suggestions:
+            for s in suggestions: st.success(s)
         else:
-            # 2. Préparation des dates et zones
-            df['Date_Obj'] = pd.to_datetime(df[col_date])
-            df['Date_F'] = df['Date_Obj'].dt.strftime('%d/%m/%Y')
-            df['Zone_Affiche'] = df['Batiment'].map(ZONES).fillna('Autre')
-            
-            # Tri pour calcul : Date -> Zone -> Heure
-            df['H_Tri'] = df['Heure'].astype(str).str.lower().str.strip().replace('libre', '00:00')
-            df = df.sort_values(by=['Date_Obj', 'Zone_Affiche', 'H_Tri'])
-            
-            # 3. Attribution des agents par zone
-            df['GID'] = df['Date_F'] + "_" + df['Zone_Affiche']
-            grps = df['GID'].unique()
-            map_agt = {g: agents_actifs[i % len(agents_actifs)] for i, g in enumerate(grps)}
-            df['Agent_Attribue'] = df['GID'].map(map_agt)
+            st.info("ℹ️ Aucune mission dans cette zone ce jour-là.")
 
-            # 4. LOGIQUE DE CALCUL (Trajet Réel + Terrain 08h-15h)
-            df = df.sort_values(by=['Date_Obj', 'Agent_Attribue', 'H_Tri'])
-            suggestions = []
-            fin_par_cle = {} 
-            zone_par_cle = {} 
+    # Choix final par la collaboratrice
+    c_agt, c_hr = st.columns(2)
+    with c_agt: agent_choisi = st.selectbox("Attribuer à :", AGENTS)
+    with c_hr: heure_choisie = st.time_input("Heure du RDV :", datetime.strptime("08:00", "%H:%M"))
 
-            for i, row in df.iterrows():
-                agent = row['Agent_Attribue']
-                jour = row['Date_F']
-                cle = f"{jour}_{agent}"
-                
-                h_in = str(row['Heure']).lower().strip()
-                zone_actuelle = row['Zone_Affiche']
-                duree_rdv = timedelta(hours=1, minutes=15) # 1h rdv + 15 min admin
+    if st.button("✅ Valider et Ajouter au Planning"):
+        nouvelle_ligne = {
+            'Batiment': nouveau_bat, 
+            'Date': date_str, 
+            'Heure': heure_choisie.strftime('%H:%M'), 
+            'Agent': agent_choisi, 
+            'Zone': zone_cible
+        }
+        st.session_state.db = pd.concat([st.session_state.db, pd.DataFrame([nouvelle_ligne])], ignore_index=True)
+        st.balloons()
 
-                # Initialisation (Début à 06h30, mais terrain à 08h00)
-                if cle not in fin_par_cle:
-                    fin_par_cle[cle] = datetime.strptime("08:00", "%H:%M")
-                    zone_par_cle[cle] = zone_actuelle
+# --- 3. VISION GLOBALE DES 30 DOSSIERS ---
+st.divider()
+st.subheader("📅 Tableau de Bord du Mois")
 
-                # CALCUL DU TRAJET RÉEL
-                temps_route = calculer_temps_trajet(zone_par_cle[cle], zone_actuelle)
-                fin_par_cle[cle] += timedelta(minutes=temps_route)
-                
-                zone_par_cle[cle] = zone_actuelle
+if not st.session_state.db.empty:
+    # Tri intelligent
+    df_tri = st.session_state.db.sort_values(by=['Date', 'Agent', 'Heure'])
+    
+    # Filtre par agent pour les collaboratrices
+    view_agt = st.multiselect("Filtrer par collaboratrice :", AGENTS, default=AGENTS)
+    df_filtered = df_tri[df_tri['Agent'].isin(view_agt)]
+    
+    # Affichage stylisé
+    def color_agent(val):
+        if val == 'Maria Claret': return 'background-color: #ffdae0'
+        if val == 'Celine': return 'background-color: #d1e9ff'
+        if val == 'Maria Elisabeth': return 'background-color: #d4f8d4'
+        return ''
 
-                if h_in != 'libre' and h_in != '':
-                    try:
-                        h_dt = datetime.strptime(h_in[:5].replace('h', ':'), "%H:%M")
-                        if h_dt < fin_par_cle[cle]:
-                            suggestions.append(f"❌ CONFLIT: Trajet insuffisant ({h_dt.strftime('%H:%M')})")
-                        else:
-                            suggestions.append(h_dt.strftime('%H:%M'))
-                        fin_par_cle[cle] = h_dt + duree_rdv
-                    except: suggestions.append(h_in)
-                else:
-                    h_s = fin_par_cle[cle]
-                    if h_s + duree_rdv > datetime.strptime("12:00", "%H:%M") and h_s < datetime.strptime("13:00", "%H:%M"):
-                        h_s = datetime.strptime("13:00", "%H:%M")
-                    
-                    if h_s > datetime.strptime("15:00", "%H:%M"):
-                        suggestions.append("⚠️ Trop tard")
-                    else:
-                        suggestions.append(f"Suggéré: {h_s.strftime('%H:%M')}")
-                        fin_par_cle[cle] = h_s + duree_rdv
+    st.table(df_filtered.style.applymap(color_agent, subset=['Agent']))
 
-            df['Résultat'] = suggestions
+    # --- 4. ANALYSE DE PERFORMANCE ---
+    st.subheader("📊 Analyse de l'Optimisation")
+    c1, c2, c3 = st.columns(3)
+    
+    # Calcul de la charge
+    total_missions = len(st.session_state.db)
+    c1.metric("Dossiers Planifiés", f"{total_missions} / 30")
+    
+    # Calcul des regroupements (Performance)
+    groupements = st.session_state.db.groupby(['Date', 'Zone']).size()
+    succes_groupes = len(groupements[groupements > 1])
+    c2.metric("Regroupements réussis", succes_groupes, help="Nombre de fois où plusieurs missions sont dans la même zone le même jour.")
+    
+    # Alerte Surcharge
+    surcharge = st.session_state.db.groupby(['Date', 'Agent']).size()
+    jours_critiques = len(surcharge[surcharge > 4])
+    c3.metric("Alertes Surcharge", jours_critiques, delta_color="inverse", delta="Jours > 4 rdv")
 
-            # 5. Affichage final
-            dates_dispo = sorted(df['Date_F'].unique())
-            sel_date = st.sidebar.selectbox("Choisir une date :", dates_dispo)
-            
-            st.subheader(f"Planning du {sel_date}")
-            df_view = df[df['Date_F'] == sel_date][['ID', 'Batiment', 'Agent_Attribue', 'Résultat', 'Type']]
-            
-            def style_agt(row):
-                color = '#ffdae0' if row['Agent_Attribue'] == 'Maria Claret' else '#d1e9ff' if row['Agent_Attribue'] == 'Celine' else '#d4f8d4'
-                styles = [f'background-color: {color}'] * len(row)
-                if "❌" in str(row['Résultat']):
-                    styles[3] = 'background-color: #ff4b4b; color: white; font-weight: bold'
-                return styles
+else:
+    st.info("Le planning est vide. Commencez à ajouter des dossiers ci-dessus.")
 
-            st.table(df_view.style.apply(style_agt, axis=1))
-
-    except Exception as e:
-        st.error(f"Une erreur est survenue : {e}")
+# --- BOUTON DE SAUVEGARDE ---
+if st.sidebar.button("💾 Sauvegarder le planning (CSV)"):
+    csv = st.session_state.db.to_csv(index=False)
+    st.sidebar.download_button("⬇️ Télécharger", csv, "planning_avril.csv", "text/csv")
