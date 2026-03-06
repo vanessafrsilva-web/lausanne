@@ -42,31 +42,32 @@ def calculer_prochain_creneau(agent, date_str, temp_db):
     try:
         heure_obj = datetime.strptime(derniere_h_str, "%H:%M")
         prochaine_h = heure_obj + timedelta(hours=1, minutes=15)
+        # Pause déjeuner
         if datetime.strptime("12:00", "%H:%M") <= prochaine_h < datetime.strptime("13:00", "%H:%M"):
             prochaine_h = datetime.strptime("13:00", "%H:%M")
         return prochaine_h.strftime("%H:%M")
     except: return "08:15"
 
 # --- INTERFACE ---
-st.title("📍 Unité Logement : Planification & Analyses")
+st.title("📍 Unité Logement : Optimisation & Analyses")
 t1, t2, t3 = st.tabs(["📝 Planning", "📅 Calendrier", "📊 Analyses"])
 
 with st.sidebar:
-    st.header("🌴 Gestion")
+    st.header("🌴 Congés")
     abs_agt = st.selectbox("Agent", AGENTS)
     d1, d2 = st.date_input("Du"), st.date_input("Au")
     if st.button("Valider Congé"):
         st.session_state.conges = pd.concat([st.session_state.conges, pd.DataFrame([{'Agent': abs_agt, 'Date_Debut': d1.strftime('%d/%m/%Y'), 'Date_Fin': d2.strftime('%d/%m/%Y')}])], ignore_index=True)
     
     st.divider()
-    up = st.file_uploader("Importer Excel", type=['xlsx'])
-    if up and st.button("🚀 Planifier"):
+    up = st.file_uploader("Fichier Excel", type=['xlsx'])
+    if up and st.button("🚀 Planifier Avril"):
         df_ex = pd.read_excel(up).dropna(how='all').fillna('')
         df_ex.columns = df_ex.columns.str.strip()
         
         c_date = next((c for c in df_ex.columns if 'date' in c.lower()), 'Date')
         c_heure = next((c for c in df_ex.columns if 'heure' in c.lower()), 'Heure')
-        c_type = next((c for c in df_ex.columns if 'type' in c.lower()), 'Type') # Colonne Entrée/Sortie
+        c_type = next((c for c in df_ex.columns if 'type' in c.lower()), 'Type')
 
         temp = pd.DataFrame(columns=['Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Type', 'Date_Sort'])
         for _, row in df_ex.sort_values(by=[c_date]).iterrows():
@@ -84,39 +85,51 @@ with st.sidebar:
             }])], ignore_index=True)
         st.session_state.db = temp; st.rerun()
 
-# --- ONGLETS ---
+    if st.button("🗑️ Reset"):
+        st.session_state.db = pd.DataFrame(columns=['Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Type', 'Date_Sort'])
+        st.rerun()
+
 with t1:
     if not st.session_state.db.empty:
-        st.table(st.session_state.db.sort_values(['Date_Sort', 'Heure'])[['Date', 'Heure', 'Agent', 'Batiment', 'Rue', 'Type']])
+        df_v = st.session_state.db.sort_values(['Date_Sort', 'Heure'])
+        st.table(df_v[['Date', 'Heure', 'Agent', 'Batiment', 'Type']].style.apply(lambda r: [f'background-color: {COULEURS.get(r["Agent"])}']*len(r), axis=1))
+
+with t2:
+    if not st.session_state.db.empty:
+        sel_j = st.selectbox("Jour", sorted(st.session_state.db['Date'].unique()))
+        cols = st.columns(3)
+        for i, a in enumerate(AGENTS):
+            with cols[i]:
+                st.markdown(f"<div style='text-align:center; background-color:{COULEURS[a]}; padding:10px; border-radius:5px; color:black;'><b>{a}</b></div>", unsafe_allow_html=True)
+                m = st.session_state.db[(st.session_state.db['Date'] == sel_j) & (st.session_state.db['Agent'] == a)].sort_values('Heure')
+                for _, r in m.iterrows(): st.info(f"**{r['Heure']}** ({r['Type']})\n\n{r['Batiment']}")
 
 with t3:
     if not st.session_state.db.empty:
-        st.subheader("📊 Analyses de Charge")
+        st.subheader("📊 Analyses de Performance")
         
-        # Statistiques Globales
         nb_total = len(st.session_state.db)
         groupements = st.session_state.db.groupby(['Date', 'Rue']).size()
         taux_opti = (len(groupements[groupements > 1]) / nb_total * 100) if nb_total > 0 else 0
         
         c1, c2 = st.columns(2)
         c1.metric("Total Missions", nb_total)
-        c2.metric("Taux d'Optimisation", f"{int(taux_opti)}%", help="Pourcentage de missions regroupées dans la même rue")
+        c2.metric("Taux d'Optimisation", f"{int(taux_opti)}%")
 
         st.divider()
-        sel_j = st.selectbox("Analyse détaillée du :", sorted(st.session_state.db['Date'].unique()), key="stats")
-        day_d = st.session_state.db[st.session_state.db['Date'] == sel_j]
+        sel_j_stats = st.selectbox("Détail journalier :", sorted(st.session_state.db['Date'].unique()), key="stats")
+        day_d = st.session_state.db[st.session_state.db['Date'] == sel_j_stats]
         
         for a in AGENTS:
             agt_d = day_d[day_d['Agent'] == a].sort_values('Heure')
             if not agt_d.empty:
                 st.markdown(f"#### 👩‍💻 {a}")
-                nb_entrees = len(agt_d[agt_d['Type'].str.contains('Entrée', case=False, na=False)])
-                nb_sorties = len(agt_d[agt_d['Type'].str.contains('Sortie', case=False, na=False)])
-                
+                nb_e = len(agt_d[agt_d['Type'].str.contains('Entrée', case=False, na=False)])
+                nb_s = len(agt_d[agt_d['Type'].str.contains('Sortie', case=False, na=False)])
                 itin = [BUREAU] + agt_d['Rue'].tolist() + [BUREAU]
                 t_route = sum([15 if itin[k] != itin[k+1] else 5 for k in range(len(itin)-1)])
                 
-                col_a, col_b = st.columns(2)
-                col_a.write(f"🏠 **Terrain : {len(agt_d)}h00** | 🚗 **Route : {t_route} min**")
-                col_b.write(f"📥 **Entrées : {nb_entrees}** | 📤 **Sorties : {nb_sorties}**")
+                col_x, col_y = st.columns(2)
+                col_x.write(f"🏠 **Terrain : {len(agt_d)}h00** | 🚗 **Route : {t_route} min**")
+                col_y.write(f"📥 **Entrées : {nb_e}** | 📤 **Sorties : {nb_s}**")
                 st.divider()
