@@ -55,8 +55,8 @@ def calculer_creneau_securise(agent, date_str, temp_db, batiment_cible):
         if datetime.strptime("12:00", "%H:%M") <= prochaine_h < datetime.strptime("13:00", "%H:%M"):
             prochaine_h = datetime.strptime("13:00", "%H:%M")
             
-        # Sécurité : Pas de RDV débutant après 16h15
-        if prochaine_h > datetime.strptime("16:15", "%H:%M"):
+        # Sécurité : Pas de RDV débutant après 15h15
+        if prochaine_h > datetime.strptime("15:15", "%H:%M"):
             return "COMPLET", False
             
         return prochaine_h.strftime("%H:%M"), True
