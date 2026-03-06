@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 
 # --- CONFIGURATION FIXE ---
-BUREAU = "Mon Paisible 18, 1007 Lausanne"
+BUREAU = "18 Mon Repos" # Mis à jour selon vos informations
 AGENTS = ["Celine", "Maria Claret", "Maria Elisabeth"]
 
 INFOS_BATIMENTS = {
@@ -24,10 +24,22 @@ COULEURS = {
 
 st.set_page_config(page_title="Unité Logement", layout="wide")
 
+# Initialisation des bases de données dans la session
 if 'db' not in st.session_state:
     st.session_state.db = pd.DataFrame(columns=['Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Type', 'Date_Sort'])
+if 'conges' not in st.session_state:
+    st.session_state.conges = pd.DataFrame(columns=['Agent', 'Date'])
 
-# --- MOTEUR D'ATTRIBUTION PRIORITÉ CÉLINE + PAUSE MIDI ---
+# --- FONCTION DE VÉRIFICATION DE DISPONIBILITÉ ---
+def est_disponible(agent, date_str):
+    if st.session_state.conges.empty:
+        return True
+    # Vérifie si l'agent a un congé enregistré à cette date
+    match = st.session_state.conges[(st.session_state.conges['Agent'] == agent) & 
+                                    (st.session_state.conges['Date'] == date_str)]
+    return match.empty
+
+# --- MOTEUR D'ATTRIBUTION AVEC FILTRE ABSENCES ---
 def trouver_meilleur_creneau(batiment, date_str, temp_db):
     rue_cible = INFOS_BATIMENTS.get(batiment, "Autre")
     missions_jour = temp_db[temp_db['Date'] == date_str]
@@ -39,24 +51,35 @@ def trouver_meilleur_creneau(batiment, date_str, temp_db):
             return pause_fin
         return heure_fin_mission
 
-    if missions_jour.empty:
-        return "Celine", "08:15"
+    # Liste des agents réellement présents ce jour-là
+    agents_presents = [a for a in AGENTS if est_disponible(a, date_str)]
     
-    celine_meme_rue = missions_jour[(missions_jour['Agent'] == "Celine") & (missions_jour['Rue'] == rue_cible)]
-    if not celine_meme_rue.empty:
-        dernier = celine_meme_rue.sort_values(by='Heure').iloc[-1]
-        h_fin = datetime.strptime(dernier['Heure'], "%H:%M") + timedelta(hours=1, minutes=20)
-        h_fin = ajuster_pause(h_fin)
-        return "Celine", h_fin.strftime("%H:%M")
+    if not agents_presents:
+        return "À définir (Tous absents)", "08:15"
 
-    missions_celine = missions_jour[missions_jour['Agent'] == "Celine"]
-    if not missions_celine.empty:
-        h_fin_celine = datetime.strptime(missions_celine.sort_values(by='Heure').iloc[-1]['Heure'], "%H:%M") + timedelta(hours=1, minutes=45)
-        h_fin_celine = ajuster_pause(h_fin_celine)
-        if h_fin_celine < datetime.strptime("15:30", "%H:%M"):
-            return "Celine", h_fin_celine.strftime("%H:%M")
-    
-    for agent_surplus in ["Maria Claret", "Maria Elisabeth"]:
+    # PRIORITÉ 1 : CELINE (si présente)
+    if "Celine" in agents_presents:
+        # Même rue ?
+        celine_meme_rue = missions_jour[(missions_jour['Agent'] == "Celine") & (missions_jour['Rue'] == rue_cible)]
+        if not celine_meme_rue.empty:
+            dernier = celine_meme_rue.sort_values(by='Heure').iloc[-1]
+            h_fin = datetime.strptime(dernier['Heure'], "%H:%M") + timedelta(hours=1, minutes=20)
+            h_fin = ajuster_pause(h_fin)
+            return "Celine", h_fin.strftime("%H:%M")
+
+        # Sinon, selon son heure de fin
+        missions_celine = missions_jour[missions_jour['Agent'] == "Celine"]
+        if missions_celine.empty:
+            return "Celine", "08:15"
+        else:
+            h_fin_celine = datetime.strptime(missions_celine.sort_values(by='Heure').iloc[-1]['Heure'], "%H:%M") + timedelta(hours=1, minutes=45)
+            h_fin_celine = ajuster_pause(h_fin_celine)
+            if h_fin_celine < datetime.strptime("15:30", "%H:%M"):
+                return "Celine", h_fin_celine.strftime("%H:%M")
+
+    # PRIORITÉ 2 : SURPLUS (Maria Claret ou Elisabeth si présentes)
+    surplus_presents = [a for a in ["Maria Claret", "Maria Elisabeth"] if a in agents_presents]
+    for agent_surplus in surplus_presents:
         missions_agt = missions_jour[missions_jour['Agent'] == agent_surplus]
         if missions_agt.empty:
             return agent_surplus, "08:15"
@@ -66,16 +89,31 @@ def trouver_meilleur_creneau(batiment, date_str, temp_db):
             if h_fin_agt < datetime.strptime("16:00", "%H:%M"):
                 return agent_surplus, h_fin_agt.strftime("%H:%M")
 
-    return "Celine", "Surcharge"
+    return agents_presents[0], "Surcharge"
 
 # TITRE FIXE
 st.title("📍 Unité Logement : Optimisation Attibutions")
 
 # --- BARRE LATÉRALE ---
 with st.sidebar:
+    st.header("🌴 Gestion des Absences")
+    abs_agent = st.selectbox("Collaboratrice absente", AGENTS)
+    abs_date = st.date_input("Date de l'absence")
+    if st.button("Enregistrer l'absence"):
+        nouvel_abs = pd.DataFrame([{'Agent': abs_agent, 'Date': abs_date.strftime('%d/%m/%Y')}])
+        st.session_state.conges = pd.concat([st.session_state.conges, nouvel_abs], ignore_index=True)
+        st.success(f"Absence de {abs_agent} enregistrée")
+    
+    if not st.session_state.conges.empty:
+        st.write("Absences prévues :")
+        st.dataframe(st.session_state.conges, hide_index=True)
+        if st.button("Effacer les absences"):
+            st.session_state.conges = pd.DataFrame(columns=['Agent', 'Date'])
+            st.rerun()
+
+    st.divider()
     st.header("📥 Importation Massive")
     uploaded = st.file_uploader("Fichier Excel", type=['xlsx'])
-    
     if uploaded and st.button("🚀 Planifier Avril"):
         df_ex = pd.read_excel(uploaded).dropna(how='all').fillna('')
         df_ex.columns = df_ex.columns.str.strip()
@@ -95,66 +133,45 @@ with st.sidebar:
         st.session_state.db = temp_db
         st.success("Planning optimisé !")
 
-    st.divider()
-    st.header("📊 Performance")
-    if not st.session_state.db.empty:
-        total = len(st.session_state.db)
-        groupements = st.session_state.db.groupby(['Date', 'Rue']).size()
-        score = (len(groupements[groupements > 1]) / total * 100) if total > 0 else 0
-        st.metric("Taux d'Occupation", f"{int(score)}%")
-        
-        if st.button("🗑️ Reset Planning"):
-            st.session_state.db = pd.DataFrame(columns=['Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Type', 'Date_Sort'])
-            st.rerun()
-
 # --- FORMULAIRE MANUEL ---
 with st.expander("➕ AJOUTER / MODIFIER UN DOSSIER"):
     c1, c2 = st.columns(2)
     with c1:
         n_bat = st.selectbox("Bâtiment", list(INFOS_BATIMENTS.keys()))
-        n_date = st.date_input("Date")
+        n_date = st.date_input("Date du dossier")
         date_str = n_date.strftime('%d/%m/%Y')
     with c2:
         s_agt, s_hr = trouver_meilleur_creneau(n_bat, date_str, st.session_state.db)
-        f_agt = st.selectbox("Agent recommandé", AGENTS, index=AGENTS.index(s_agt))
+        # On ajuste l'index pour Streamlit si l'agent recommandé est absent
+        idx_reco = AGENTS.index(s_agt) if s_agt in AGENTS else 0
+        f_agt = st.selectbox("Agent recommandé", AGENTS, index=idx_reco)
         f_hr = st.text_input("Heure", value=s_hr)
-    if st.button("Enregistrer"):
+    if st.button("Enregistrer le dossier"):
         l = {'Batiment': n_bat, 'Date': date_str, 'Heure': f_hr, 'Agent': f_agt, 
              'Rue': INFOS_BATIMENTS.get(n_bat, "Autre"), 'Type': "Manuel", 'Date_Sort': pd.to_datetime(n_date)}
         st.session_state.db = pd.concat([st.session_state.db, pd.DataFrame([l])], ignore_index=True)
         st.rerun()
 
-# --- SYSTÈME DE FILTRES DYNAMIQUES ---
+# --- FILTRES ET TABLEAU ---
 st.divider()
 if not st.session_state.db.empty:
-    st.subheader("🔍 Filtres d'affichage")
+    st.subheader("🔍 Filtres et Vue d'ensemble")
     f1, f2, f3 = st.columns(3)
-    
     with f1:
-        list_dates = ["Tout"] + sorted(st.session_state.db['Date'].unique().tolist())
-        sel_date = st.selectbox("Filtrer par Date :", list_dates)
+        sel_date = st.selectbox("Date :", ["Tout"] + sorted(st.session_state.db['Date'].unique().tolist()))
     with f2:
-        list_agents = ["Tout"] + AGENTS
-        sel_agent = st.selectbox("Filtrer par Collaboratrice :", list_agents)
+        sel_agent = st.selectbox("Collaboratrice :", ["Tout"] + AGENTS)
     with f3:
-        list_bats = ["Tout"] + sorted(st.session_state.db['Batiment'].unique().tolist())
-        sel_bat = st.selectbox("Filtrer par Bâtiment :", list_bats)
+        sel_bat = st.selectbox("Bâtiment :", ["Tout"] + sorted(st.session_state.db['Batiment'].unique().tolist()))
 
-    # Application des filtres
     df_v = st.session_state.db.copy()
-    if sel_date != "Tout":
-        df_v = df_v[df_v['Date'] == sel_date]
-    if sel_agent != "Tout":
-        df_v = df_v[df_v['Agent'] == sel_agent]
-    if sel_bat != "Tout":
-        df_v = df_v[df_v['Batiment'] == sel_bat]
+    if sel_date != "Tout": df_v = df_v[df_v['Date'] == sel_date]
+    if sel_agent != "Tout": df_v = df_v[df_v['Agent'] == sel_agent]
+    if sel_bat != "Tout": df_v = df_v[df_v['Batiment'] == sel_bat]
 
-    # Tri final (Date, Heure, Agent)
     df_v = df_v.sort_values(by=['Date_Sort', 'Heure', 'Agent'])
 
-    # Style
     def style_agent(row):
         return [f'background-color: {COULEURS.get(row["Agent"])}'] * len(row)
 
-    st.write(f"**Nombre d'entrées affichées :** {len(df_v)}")
     st.table(df_v[['Date', 'Heure', 'Agent', 'Batiment', 'Rue']].style.apply(style_agent, axis=1))
