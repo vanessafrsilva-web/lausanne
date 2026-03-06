@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 
 # --- CONFIGURATION FIXE ---
-BUREAU = "18 Mon Repos"
+BUREAU = "18 Mont Paisible"
 AGENTS = ["Celine", "Maria Claret", "Maria Elisabeth"]
 
 INFOS_BATIMENTS = {
