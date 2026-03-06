@@ -5,38 +5,28 @@ from datetime import datetime, timedelta
 # --- CONFIGURATION ---
 BUREAU = "Chemin Mont Paisible 18, 1011 Lausanne"
 AGENTS = ["Celine", "Maria Claret", "Maria Elisabeth"]
+
+# Adresses pour le calcul des trajets
 INFOS_BATIMENTS = {
     'Bethusy A': 'Avenue de Béthusy 54, Lausanne',
     'Bethusy B': 'Avenue de Béthusy 56, Lausanne',
     'Montolieu A': 'Isabelle-de-Montolieu 90, Lausanne',
     'Montolieu B': 'Isabelle-de-Montolieu 92, Lausanne',
     'Tunnel': 'Rue du Tunnel 17, Lausanne',
-    'Oron': "Route d'Oron 77, Lausanne"
+    'Oron': "Route d'Oron 77, 1073 Savigny"
 }
-COULEURS = {"Celine": "#d1e9ff", "Maria Claret": "#ffdae0", "Maria Elisabeth": "#d4f8d4", "À définir": "#eeeeee"}
 
-st.set_page_config(page_title="Unité Logement - Export PDF", layout="wide")
+COULEURS = {"Celine": "#d1e9ff", "Maria Claret": "#ffdae0", "Maria Elisabeth": "#d4f8d4"}
 
-# CSS spécial pour l'impression PDF (cache les menus Streamlit lors de l'impression)
-st.markdown("""
-    <style>
-    @media print {
-        header, footer, .stSidebar, .stButton, .stSelectbox {
-            display: none !important;
-        }
-        .main .block-container {
-            padding: 0 !important;
-        }
-    }
-    </style>
-""", unsafe_allow_html=True)
+st.set_page_config(page_title="Unité Logement - Expert", layout="wide")
 
+# Initialisation
 if 'db' not in st.session_state:
     st.session_state.db = pd.DataFrame(columns=['Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Type', 'Date_Sort'])
 if 'conges' not in st.session_state:
     st.session_state.conges = pd.DataFrame(columns=['Agent', 'Date_Debut', 'Date_Fin'])
 
-# --- FONCTIONS LOGIQUES (RESTE IDENTIQUE) ---
+# --- FONCTIONS LOGIQUES ---
 def est_disponible(agent, date_str):
     if st.session_state.conges.empty: return True
     try:
@@ -70,14 +60,14 @@ def trouver_meilleur_creneau(batiment, date_str, temp_db):
     return presents[0], "08:15"
 
 # --- INTERFACE ---
-st.title("📍 Unité Logement : Gestion & Export")
-t1, t2, t3 = st.tabs(["📝 Planning", "📅 Calendrier (PDF)", "📊 Analyses (PDF)"])
+st.title("📍 Unité Logement : Optimisation & Analyses")
+t1, t2, t3 = st.tabs(["📝 Planning", "📅 Calendrier", "📊 Analyses de Charge"])
 
 with st.sidebar:
     st.header("🌴 Congés")
     abs_agt = st.selectbox("Agent", AGENTS)
     d1, d2 = st.date_input("Du"), st.date_input("Au")
-    if st.button("Enregistrer"):
+    if st.button("Valider"):
         st.session_state.conges = pd.concat([st.session_state.conges, pd.DataFrame([{'Agent': abs_agt, 'Date_Debut': d1.strftime('%d/%m/%Y'), 'Date_Fin': d2.strftime('%d/%m/%Y')}])], ignore_index=True)
     st.divider()
     up = st.file_uploader("Excel", type=['xlsx'])
@@ -98,43 +88,68 @@ with t1:
 
 with t2:
     if not st.session_state.db.empty:
-        sel_j = st.selectbox("Sélectionner la date pour le PDF :", sorted(st.session_state.db['Date'].unique()))
-        st.markdown(f"## 📅 Planning Journalier - {sel_j}")
-        st.write(f"Bureau : {BUREAU}")
+        sel_j = st.selectbox("Jour", sorted(st.session_state.db['Date'].unique()))
         cols = st.columns(3)
         for i, a in enumerate(AGENTS):
             with cols[i]:
-                st.markdown(f"<div style='text-align:center; background-color:{COULEURS[a]}; padding:10px; border:1px solid black;'><b>{a}</b></div>", unsafe_allow_html=True)
+                st.markdown(f"<div style='text-align:center; background-color:{COULEURS[a]}; padding:10px; border-radius:5px;'><b>{a}</b></div>", unsafe_allow_html=True)
                 m = st.session_state.db[(st.session_state.db['Date'] == sel_j) & (st.session_state.db['Agent'] == a)].sort_values(by='Heure')
-                if m.empty: st.write("*Aucune mission*")
-                else:
-                    for _, r in m.iterrows():
-                        st.markdown(f"**{r['Heure']}** : {r['Batiment']}<br><small>{r['Rue']}</small>", unsafe_allow_html=True)
-                        st.write("---")
-        st.info("💡 Pour exporter en PDF : Appuyez sur **Ctrl + P** et choisissez 'Enregistrer au format PDF'.")
+                for _, r in m.iterrows(): st.info(f"**{r['Heure']}** - {r['Batiment']}")
 
+# --- ONGLET ANALYSES COMPLET ---
 with t3:
     if not st.session_state.db.empty:
-        st.markdown(f"## 📊 Rapport d'Analyse de Charge")
-        nb_total = len(st.session_state.db)
-        st.write(f"**Période :** Avril 2026 | **Total Missions :** {nb_total}")
+        st.subheader("📊 Rapport d'activité et Déplacements")
         
-        # Résumé par agent
-        stats = st.session_state.db['Agent'].value_counts()
-        for agt in AGENTS:
-            count = stats.get(agt, 0)
-            st.write(f"- **{agt}** : {count} entretiens ({count}h de terrain)")
+        # 1. Résumé Global
+        nb_tot = len(st.session_state.db)
+        groupements = st.session_state.db.groupby(['Date', 'Rue']).size()
+        opti = (len(groupements[groupements > 1]) / nb_tot * 100) if nb_tot > 0 else 0
         
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Total Entretiens", f"{nb_tot}")
+        c2.metric("Temps Terrain Total", f"{nb_tot}h")
+        c3.metric("Taux d'Optimisation", f"{int(opti)}%")
+
         st.divider()
-        st.write("### Détail des trajets estimatifs")
-        sel_j_stats = st.selectbox("Jour pour l'analyse de route :", sorted(st.session_state.db['Date'].unique()), key="stats_pdf")
+
+        # 2. Détail par Collaboratrice (Temps de Route)
+        sel_j_stats = st.selectbox("Sélectionner une journée pour analyser les trajets :", sorted(st.session_state.db['Date'].unique()))
+        st.write(f"### Détail des déplacements du {sel_j_stats}")
+        
         day_data = st.session_state.db[st.session_state.db['Date'] == sel_j_stats]
         
         for agent in AGENTS:
             agt_data = day_data[day_data['Agent'] == agent].sort_values(by='Heure')
             if not agt_data.empty:
-                st.write(f"**Itinéraire {agent} :**")
-                itin = [BUREAU] + agt_data['Rue'].tolist() + [BUREAU]
-                for k in range(len(itin)-1):
-                    st.write(f"🚗 {itin[k]} ➡️ {itin[k+1]}")
-        st.info("💡 Pour exporter ce rapport : Appuyez sur **Ctrl + P**.")
+                st.markdown(f"#### 👩‍💻 {agent}")
+                
+                # Itinéraire : Bureau -> Missions -> Bureau
+                itineraire = [BUREAU] + agt_data['Rue'].tolist() + [BUREAU]
+                temps_route_total = 0
+                
+                # Tableau de trajet
+                trajets = []
+                for k in range(len(itineraire)-1):
+                    dep = itineraire[k]
+                    arr = itineraire[k+1]
+                    
+                    # Logique de temps : Oron est loin, le centre est plus proche
+                    if "Oron" in dep or "Oron" in arr:
+                        duree = 25 
+                    elif dep == arr:
+                        duree = 5 # Même rue
+                    else:
+                        duree = 15 # Trajet standard Lausanne
+                        
+                    temps_route_total += duree
+                    trajets.append({"De": dep.split(',')[0], "À": arr.split(',')[0], "Temps est.": f"{duree} min"})
+                
+                st.table(pd.DataFrame(trajets))
+                
+                col_res1, col_res2 = st.columns(2)
+                col_res1.write(f"🏠 **Total Terrain :** {len(agt_data)}h00")
+                col_res2.write(f"🚗 **Total Route :** {temps_route_total} min")
+                st.divider()
+    else:
+        st.info("Veuillez importer des données pour générer les analyses.")
