@@ -25,7 +25,7 @@ COULEURS_HEX = {
     "⚠️ SANS AGENT": "#eeeeee"
 }
 
-# Couleurs pour la carte (RGB pour éviter l'erreur JSON)
+# Couleurs pour la carte (RGB)
 COULEURS_RGB = {
     "Celine": [0, 123, 255, 160],
     "Maria Claret": [255, 51, 161, 160],
@@ -41,10 +41,13 @@ if 'db' not in st.session_state:
 # --- FONCTIONS LOGIQUES ---
 
 def calculer_creneau_securise(agent, date_str, temp_db, batiment_cible, bloc_impose=None, heure_forcee=None):
+    # On regarde ce que l'agent a déjà ce jour-là
     m_jour = temp_db[(temp_db['Date'] == date_str) & (temp_db['Agent'] == agent)]
+    
     if heure_forcee:
-        if not m_jour.empty and heure_forcee in [str(h) for h in m_jour['Heure'].values]:
-            return "⚠️ CONFLIT", False
+        # Si l'heure est déjà prise exactement par ce même agent
+        if not m_jour.empty and heure_forcee in [str(h).strip() for h in m_jour['Heure'].values]:
+            return "⚠️ CONFLIT", True # On retourne True pour forcer l'ajout malgré le conflit
         return heure_forcee, True
 
     if m_jour.empty:
@@ -53,6 +56,7 @@ def calculer_creneau_securise(agent, date_str, temp_db, batiment_cible, bloc_imp
         h_depart_str = str(m_jour.iloc[-1]['Heure']).strip()
 
     try:
+        if "⚠️" in h_depart_str: h_depart_str = "08:15"
         h_obj = datetime.strptime(h_depart_str, "%H:%M")
         info_b = INFOS_BATIMENTS.get(batiment_cible, {'rue': 'Autre'})
         rue_cible = info_b['rue']
@@ -123,79 +127,62 @@ with st.sidebar:
         st.rerun()
 
 # --- CORPS PRINCIPAL ---
-st.title("📍 Unité Logement : Planning & Rapports")
+st.title("📍 Unité Logement : Planning")
 
 t1, t2, t3 = st.tabs(["📝 Planning Global", "📅 Vue par Agent", "📊 Rapports Mensuels"])
 
 with t1:
     if not st.session_state.db.empty:
         df_v = st.session_state.db.sort_values(['Date_Sort', 'Heure'])
-        
         def style_row(s):
+            if "⚠️ CONFLIT" in str(s['Heure']): return ['background-color: #ffb3b3; color: #b30000; font-weight: bold']*7
             color = COULEURS_HEX.get(s['Agent'], "#eeeeee")
-            if s['Heure'] == "⚠️ CONFLIT": return ['background-color: #ffcccc; color: red']*7
-            if s['Statut'] != "": return [f'background-color: {color}; border: 2px solid orange']*7
             return [f'background-color: {color}']*7
-
         st.dataframe(df_v[['Date', 'Heure', 'Agent', 'Batiment', 'Type', 'Statut', 'Rue']].style.apply(style_row, axis=1), use_container_width=True, height=500)
 
 with t2:
     if not st.session_state.db.empty:
-        sel_j = st.selectbox("Date :", sorted(st.session_state.db['Date'].unique(), key=lambda x: datetime.strptime(x, '%d/%m/%Y')))
+        sel_j = st.selectbox("Sélectionner la date :", sorted(st.session_state.db['Date'].unique(), key=lambda x: datetime.strptime(x, '%d/%m/%Y')))
         cols = st.columns(len(AGENTS))
         for i, a in enumerate(AGENTS):
             with cols[i]:
                 st.markdown(f"<div style='text-align:center; background-color:{COULEURS_HEX[a]}; padding:10px; border-radius:5px; color:black; font-weight:bold; margin-bottom:10px'>{a}</div>", unsafe_allow_html=True)
-                m = st.session_state.db[(st.session_state.db['Date'] == sel_j) & (st.session_state.db['Agent'] == a)].sort_values('Heure')
-                for _, r in m.iterrows():
-                    st.info(f"🕒 **{r['Heure']}**\n\n**{r['Batiment']}**\n\n_{r['Type']}_")
+                # On récupère toutes les missions de l'agent pour ce jour
+                m_agent = st.session_state.db[(st.session_state.db['Date'] == sel_j) & (st.session_state.db['Agent'] == a)].sort_values('Heure')
+                
+                for _, r in m_agent.iterrows():
+                    # Si c'est un conflit, on affiche en rouge
+                    if "⚠️ CONFLIT" in str(r['Heure']):
+                        st.error(f"🚨 **CONFLIT**\n\nHeure Excel identique\n\n**{r['Batiment']}**")
+                    else:
+                        st.info(f"🕒 **{r['Heure']}**\n\n**{r['Batiment']}**\n\n_{r['Type']}_")
 
 with t3:
     if not st.session_state.db.empty:
         df_rep = st.session_state.db.copy()
         df_rep['Mois'] = df_rep['Date_Sort'].dt.strftime('%B %Y')
-        
-        m1, m2 = st.columns(2)
-        mois_sel = m1.selectbox("Filtrer Mois :", df_rep['Mois'].unique())
-        agt_map_sel = m2.selectbox("Filtrer Agent (Carte) :", ["Tous"] + AGENTS)
-        
+        mois_sel = st.selectbox("Mois :", df_rep['Mois'].unique())
         df_m = df_rep[df_rep['Mois'] == mois_sel]
-        
-        # Stats
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Missions", len(df_m))
-        c2.metric("Entrées", len(df_m[df_m['Type'].str.contains('Entrée|In', case=False)]))
-        c3.metric("Sorties", len(df_m[df_m['Type'].str.contains('Sortie|Out', case=False)]))
         
         st.divider()
         cl, cr = st.columns([1, 1.5])
-        
         with cl:
-            st.subheader("🏠 Volume Bâtiments")
-            stats = df_m.groupby('Batiment').size().reset_index(name='Nb').sort_values('Nb', ascending=False)
-            st.table(stats)
-            
+            st.subheader("🏠 Volume")
+            st.table(df_m.groupby('Batiment').size().reset_index(name='Nb').sort_values('Nb', ascending=False))
         with cr:
             st.subheader("📍 Carte")
-            df_map_data = df_m.copy()
-            if agt_map_sel != "Tous":
-                df_map_data = df_map_data[df_map_data['Agent'] == agt_map_sel]
-            
             map_points = []
-            for bat in df_map_data['Batiment'].unique():
+            for bat in df_m['Batiment'].unique():
                 if bat in INFOS_BATIMENTS:
-                    count = len(df_map_data[df_map_data['Batiment'] == bat])
-                    agent_name = df_map_data[df_map_data['Batiment'] == bat]['Agent'].iloc[0]
+                    count = len(df_m[df_m['Batiment'] == bat])
+                    agt_name = df_m[df_m['Batiment'] == bat]['Agent'].iloc[0]
                     map_points.append({
                         'lat': float(INFOS_BATIMENTS[bat]['lat']),
                         'lon': float(INFOS_BATIMENTS[bat]['lon']),
                         'Taille': int(count * 40),
-                        'Couleur': COULEURS_RGB.get(agent_name, [200, 200, 200, 150])
+                        'Couleur': COULEURS_RGB.get(agt_name, [200, 200, 200, 150])
                     })
-            
             if map_points:
                 st.map(pd.DataFrame(map_points), latitude='lat', longitude='lon', size='Taille', color='Couleur')
-            else:
-                st.info("Aucune donnée géographique")
 
-st.caption("v3.3 - Restauration complète des fonctionnalités")
+st.caption("v3.4")
