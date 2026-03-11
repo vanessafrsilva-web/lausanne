@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 
 # --- CONFIGURATION FIXE ---
-BUREAU = "18 Mon Repos, 1005 Lausanne"
+BUREAU = "18 Chemin Mont Paisible, 1005 Lausanne"
 AGENTS = ["Celine", "Maria Claret", "Maria Elisabeth"]
 INFOS_BATIMENTS = {
     'Bethusy A': 'Avenue de Béthusy 54, Lausanne',
@@ -55,7 +55,6 @@ t1, t2, t3 = st.tabs(["📝 Planning Global", "📅 Vue par Agent", "📊 Rappor
 
 with st.sidebar:
     st.header("📂 Importation")
-    st.info("**Rappel :** Colonne 'Statut' (Souhaité) et colonne 'Absent' (Nom ; Nom) gérées via Excel.")
     up = st.file_uploader("Fichier Excel des missions", type=['xlsx'])
     
     if up and st.button("🚀 Lancer l'Attribution"):
