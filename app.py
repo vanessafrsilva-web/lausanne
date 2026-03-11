@@ -20,23 +20,8 @@ st.set_page_config(page_title="Unité Logement - Planning Expert v2", layout="wi
 # Initialisation des états
 if 'db' not in st.session_state:
     st.session_state.db = pd.DataFrame(columns=['Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Type', 'Date_Sort'])
-if 'conges' not in st.session_state:
-    st.session_state.conges = pd.DataFrame(columns=['Agent', 'Date_Debut', 'Date_Fin'])
 
 # --- FONCTIONS LOGIQUES ---
-
-def est_disponible(agent, date_str):
-    """Vérifie la disponibilité manuelle (via la sidebar)"""
-    if st.session_state.conges.empty: return True
-    try:
-        dt_cible = pd.to_datetime(date_str, dayfirst=True)
-        for _, c in st.session_state.conges[st.session_state.conges['Agent'] == agent].iterrows():
-            d_deb = pd.to_datetime(c['Date_Debut'], dayfirst=True)
-            d_fin = pd.to_datetime(c['Date_Fin'], dayfirst=True)
-            if d_deb <= dt_cible <= d_fin: 
-                return False
-    except: pass
-    return True
 
 def calculer_creneau_securise(agent, date_str, temp_db, batiment_cible):
     m_jour = temp_db[(temp_db['Date'] == date_str) & (temp_db['Agent'] == agent)]
@@ -69,15 +54,8 @@ st.title("📍 Unité Logement : Planning & Optimisation")
 t1, t2, t3, t4 = st.tabs(["📝 Planning Global", "📅 Vue par Agent", "📊 Performance", "💡 Optimisation"])
 
 with st.sidebar:
-    st.header("🌴 Congés / Absences")
-    abs_agt = st.selectbox("Agent", AGENTS)
-    d1, d2 = st.date_input("Du"), st.date_input("Au")
-    if st.button("Valider Congé"):
-        st.session_state.conges = pd.concat([st.session_state.conges, pd.DataFrame([{'Agent': abs_agt, 'Date_Debut': d1.strftime('%d/%m/%Y'), 'Date_Fin': d2.strftime('%d/%m/%Y')}])], ignore_index=True)
-        st.success(f"Absence enregistrée pour {abs_agt}")
-
-    st.divider()
     st.header("📂 Importation")
+    st.info("Les absences sont désormais gérées directement via la colonne 'Absent' de votre fichier Excel.")
     up = st.file_uploader("Fichier Excel des missions", type=['xlsx'])
     
     if up and st.button("🚀 Lancer l'Attribution IA"):
@@ -87,7 +65,6 @@ with st.sidebar:
         c_date = next((c for c in df_ex.columns if 'date' in c.lower()), 'Date')
         c_heure = next((c for c in df_ex.columns if 'heure' in c.lower()), 'Heure')
         c_type = next((c for c in df_ex.columns if 'type' in c.lower()), 'Type')
-        # Nouvelle détection de la colonne Absent
         c_absent = next((c for c in df_ex.columns if 'absent' in c.lower()), None)
 
         temp = pd.DataFrame(columns=['Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Type', 'Date_Sort'])
@@ -96,17 +73,13 @@ with st.sidebar:
             ds = pd.to_datetime(row[c_date]).strftime('%d/%m/%Y')
             rue_demandee = INFOS_BATIMENTS.get(row['Batiment'], "Autre")
             
-            # --- GESTION DES ABSENCES EXCEL ---
+            # Gestion des absences via Excel uniquement
             absents_du_jour = []
             if c_absent and str(row[c_absent]).strip() != "":
-                # On sépare par ; et on enlève les espaces inutiles
                 absents_du_jour = [a.strip().lower() for a in str(row[c_absent]).split(';')]
 
-            # Filtrage des agents (Dispo manuelle + pas dans la colonne Absent de l'Excel)
-            presents = [
-                a for a in AGENTS 
-                if est_disponible(a, ds) and a.lower() not in absents_du_jour
-            ]
+            # Filtrage des agents
+            presents = [a for a in AGENTS if a.lower() not in absents_du_jour]
             
             agt_elu, h_finale = "À définir", "08:15"
             
@@ -144,7 +117,7 @@ with st.sidebar:
         st.session_state.db = pd.DataFrame(columns=['Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Type', 'Date_Sort'])
         st.rerun()
 
-# --- LOGIQUE DES ONGLETS (Inchangée) ---
+# --- LOGIQUE DES ONGLETS ---
 
 with t1:
     if not st.session_state.db.empty:
@@ -217,7 +190,7 @@ with t4:
             suggestions.append({
                 "Type": "Missions en attente",
                 "Priorité": "Critique",
-                "Détail": f"Il reste **{non_attribue}** missions sans agent (conflit d'horaire, absence Excel ou congé)."
+                "Détail": f"Il reste **{non_attribue}** missions sans agent (conflit d'horaire ou absence signalée dans l'Excel)."
             })
 
         if suggestions:
