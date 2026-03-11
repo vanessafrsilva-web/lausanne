@@ -140,29 +140,40 @@ with st.sidebar:
             st.rerun()
 
 # --- ONGLETS ---
+# --- Dans l'onglet t1 (Planning Global) ---
 with t1:
     if not st.session_state.db.empty:
-        # --- FILTRES DE VUE ---
-        f_col1, f_col2 = st.columns([1, 3])
-        with f_col1:
-            agents_dispo = sorted(st.session_state.db['Agent'].unique())
-            filtre_agt = st.multiselect("🔍 Filtrer par agent :", agents_dispo, default=agents_dispo)
+        # --- FILTRE ÉLÉGANT ET COMPACT ---
+        agents_dispo = sorted(st.session_state.db['Agent'].unique())
         
-        # Application du filtre
-        df_v = st.session_state.db[st.session_state.db['Agent'].isin(filtre_agt)].sort_values(['Date_Sort', 'Heure'])
-        
-        def style_row(s):
-            if s['Heure'] == "⚠️ CONFLIT": return ['background-color: #ffcccc; color: #cc0000; font-weight: bold']*8
-            color = COULEURS.get(s['Agent'], "#eeeeee")
-            if str(s['Statut']).strip() != "": return [f'background-color: {color}; border: 2px solid #ff9933']*8
-            return [f'background-color: {color}; color: black']*8
-            
-        st.dataframe(
-            df_v[['ID', 'Date', 'Statut', 'Heure', 'Agent', 'Batiment', 'Type', 'Rue']].style.apply(style_row, axis=1), 
-            use_container_width=True, 
-            height=600
+        # Utilisation de st.pills pour un look rectangulaire et discret
+        filtre_agt = st.pills(
+            "Filtrer par agent :", 
+            agents_dispo, 
+            selection_mode="multi", 
+            default=agents_dispo
         )
-        st.info("💡 Astuce : Cliquez sur le nom d'une colonne pour trier (ex: cliquez sur 'Agent' pour grouper les missions par personne).")
+        
+        # Sécurité : si rien n'est sélectionné, on montre tout ou on avertit
+        if not filtre_agt:
+            st.info("Sélectionnez au moins un agent pour afficher le planning.")
+            df_v = pd.DataFrame()
+        else:
+            # Application du filtre
+            df_v = st.session_state.db[st.session_state.db['Agent'].isin(filtre_agt)].sort_values(['Date_Sort', 'Heure'])
+        
+        if not df_v.empty:
+            def style_row(s):
+                if s['Heure'] == "⚠️ CONFLIT": return ['background-color: #ffcccc; color: #cc0000; font-weight: bold']*8
+                color = COULEURS.get(s['Agent'], "#eeeeee")
+                if str(s['Statut']).strip() != "": return [f'background-color: {color}; border: 2px solid #ff9933']*8
+                return [f'background-color: {color}; color: black']*8
+                
+            st.dataframe(
+                df_v[['ID', 'Date', 'Statut', 'Heure', 'Agent', 'Batiment', 'Type', 'Rue']].style.apply(style_row, axis=1), 
+                use_container_width=True, 
+                height=600
+            )
 
 with t2:
     if not st.session_state.db.empty:
