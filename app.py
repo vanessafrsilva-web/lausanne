@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 
 # --- CONFIGURATION FIXE ---
-BUREAU = "18 Chemin Mont Paisible, 1005 Lausanne"
+BUREAU = "18 Mon Repos, 1005 Lausanne"
 AGENTS = ["Celine", "Maria Claret", "Maria Elisabeth"]
 INFOS_BATIMENTS = {
     'Bethusy A': 'Avenue de Béthusy 54, Lausanne',
@@ -106,6 +106,10 @@ with st.sidebar:
         st.session_state.db = temp
         st.rerun()
 
+    st.divider()
+    st.header("🔍 Filtres d'affichage")
+    filtre_souhaits = st.toggle("Afficher uniquement les souhaits locataires", value=False)
+
     if st.button("🗑️ Reset Complet"):
         st.session_state.db = pd.DataFrame(columns=['Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Type', 'Statut', 'Date_Sort'])
         st.rerun()
@@ -116,14 +120,17 @@ with t1:
     if not st.session_state.db.empty:
         df_v = st.session_state.db.sort_values(['Date_Sort', 'Heure'])
         
+        # Application du filtre si activé
+        if filtre_souhaits:
+            df_v = df_v[df_v['Statut'].str.lower() == "souhaité"]
+            st.info(f"Affichage de {len(df_v)} rendez-vous souhaités.")
+
         def highlight_souhait(s):
             color = COULEURS.get(s['Agent'], "#eeeeee")
             if str(s['Statut']).lower() == "souhaité":
-                # On applique le style sur les 7 colonnes affichées
                 return [f'background-color: {color}; font-weight: bold; border: 2px solid orange']*7
             return [f'background-color: {color}']*7
 
-        # --- ORDRE DES COLONNES MODIFIÉ ICI (Statut avant Heure) ---
         st.dataframe(
             df_v[['Date', 'Statut', 'Heure', 'Agent', 'Batiment', 'Type', 'Rue']].style.apply(highlight_souhait, axis=1),
             use_container_width=True, height=500
@@ -177,4 +184,4 @@ with t3:
         st.info("Importez des données pour générer les rapports.")
 
 st.divider()
-st.caption("v2.2 - Unité Logement")
+st.caption("v2.3 - Unité Logement")
