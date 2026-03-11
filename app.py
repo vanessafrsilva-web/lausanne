@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 
 # --- CONFIGURATION FIXE ---
-BUREAU = "18 Mon Repos, 1005 Lausanne"
+BUREAU = "Chemin Mont Paisible 18, 1005 Lausanne"
 AGENTS = ["Celine", "Maria Claret", "Maria Elisabeth"]
 INFOS_BATIMENTS = {
     'Bethusy A': 'Avenue de Béthusy 54, Lausanne',
@@ -35,6 +35,7 @@ def calculer_creneau_securise(agent, date_str, temp_db, batiment_cible):
 
     try:
         h_obj = datetime.strptime(derniere_h_str, "%H:%M")
+        # Si même adresse : 65min / Si adresse différente : 80min
         delai = 65 if derniere_rue == rue_cible else 80 
         prochaine_h = h_obj + timedelta(minutes=delai)
         
@@ -55,7 +56,7 @@ t1, t2, t3 = st.tabs(["📝 Planning Global", "📅 Vue par Agent", "📊 Rappor
 
 with st.sidebar:
     st.header("📂 Importation")
-    st.info("Les absences sont gérées via la colonne 'Absent' de l'Excel (ex: Celine ; Maria Claret)")
+    st.info("Gestion des absences : Ajoutez une colonne 'Absent' dans votre Excel (ex: Celine ; Maria Claret)")
     up = st.file_uploader("Fichier Excel des missions", type=['xlsx'])
     
     if up and st.button("🚀 Lancer l'Attribution"):
@@ -74,6 +75,7 @@ with st.sidebar:
             ds = dt_raw.strftime('%d/%m/%Y')
             rue_demandee = INFOS_BATIMENTS.get(row['Batiment'], "Autre")
             
+            # Logique d'absence Excel robuste (insensible à la casse, espaces et tirets)
             absents_du_jour = []
             if c_absent and str(row[c_absent]).strip() != "":
                 absents_du_jour = [a.strip().lower().replace('-', ' ') for a in str(row[c_absent]).split(';')]
@@ -133,10 +135,20 @@ with t2:
                         st.info(f"🕒 **{r['Heure']}**\n\n**{r['Batiment']}**\n\n*{r['Type']}*")
 
 with t3:
-    # --- CSS POUR FORCER LE NOIR ---
+    # --- CSS POUR FORCER LE NOIR (TABLEAUX ET TEXTES) ---
     st.markdown("""
         <style>
+        /* Force le noir sur les métriques et titres */
         [data-testid="stMetricValue"], [data-testid="stMetricLabel"], .stMarkdown p, h3 {
+            color: black !important;
+        }
+        /* Force le noir sur les cellules et entêtes des tableaux */
+        table td, table th {
+            color: black !important;
+            font-weight: 500 !important;
+        }
+        /* Suppression de la transparence Streamlit sur les tableaux */
+        .stTable {
             color: black !important;
         }
         </style>
@@ -152,6 +164,7 @@ with t3:
         
         df_mois = df_rep[df_rep['Mois'] == mois_sel]
         
+        # Calcul Entrées / Sorties
         entrees = df_mois[df_mois['Type'].str.contains('Entrée|entree|In', case=False)].shape[0]
         sorties = df_mois[df_mois['Type'].str.contains('Sortie|sortie|Out', case=False)].shape[0]
         total = len(df_mois)
@@ -170,6 +183,7 @@ with t3:
         
         with col_right:
             st.write("**Répartition par Bâtiment**")
+            # Tableau avec titre "Total"
             stats_bat = df_mois['Batiment'].value_counts().reset_index()
             stats_bat.columns = ['Bâtiment', 'Total']
             st.table(stats_bat.set_index('Bâtiment'))
