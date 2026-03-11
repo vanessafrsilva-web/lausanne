@@ -19,6 +19,20 @@ INFOS_BATIMENTS = {
     'Oron': {'rue': "Route d'Oron 77, 1010 Lausanne", 'lat': 46.5361, 'lon': 6.6625}
 }
 
+# --- CONFIGURATION DES SECTEURS ---
+SECTEURS = {
+    'Bethusy': ['Bethusy A', 'Bethusy B'],
+    'Montolieu': ['Montolieu A', 'Montolieu B'],
+    'Tunnel': ['Tunnel'],
+    'Oron': ['Oron']
+}
+
+def trouver_secteur(batiment):
+    for secteur, liste in SECTEURS.items():
+        if batiment in liste:
+            return secteur
+    return batiment 
+
 COULEURS = {"Celine": "#d1e9ff", "Maria Claret": "#ffdae0", "Maria Elisabeth": "#d4f8d4", "À définir": "#eeeeee", "⚠️ SANS AGENT": "#333333"}
 
 st.set_page_config(page_title="Unité Logement - Gestion Planning", layout="wide", page_icon="📍")
@@ -156,7 +170,6 @@ with t1:
         
         if not df_v.empty:
             def style_row(s):
-                # CHANGEMENT DE COULEUR CONFLIT : AMBRE/ORANGE
                 if s['Heure'] == "⚠️ CONFLIT": return ['background-color: #FFF3E0; color: #E65100; font-weight: bold']*8
                 color = COULEURS.get(s['Agent'], "#eeeeee")
                 if str(s['Statut']).strip() != "": return [f'background-color: {color}; border: 2px solid #ff9933']*8
@@ -179,7 +192,6 @@ with t2:
                 st.markdown(f"<div style='text-align:center; background-color:{COULEURS[a]}; padding:10px; border-radius:5px; color:black; font-weight:bold;'>{a}</div>", unsafe_allow_html=True)
                 m = st.session_state.db[(st.session_state.db['Date'] == sel_j) & (st.session_state.db['Agent'] == a)].sort_values('Heure')
                 for _, r in m.iterrows():
-                    # COULEUR CONFLIT ICI AUSSI
                     bg_color = "#FFF3E0" if r['Heure'] == "⚠️ CONFLIT" else COULEURS[a]
                     txt_color = "#E65100" if r['Heure'] == "⚠️ CONFLIT" else "black"
                     st.markdown(f"<div style='background-color:{bg_color}; padding:8px; border-radius:5px; border:1px solid #ccc; color:{txt_color}; margin-top:5px;'>🆔 <b>{r['ID']}</b><br>🕒 <b>{r['Heure']}</b><br>🏠 {r['Batiment']}</div>", unsafe_allow_html=True)
@@ -200,36 +212,50 @@ with t3:
             st.warning("Aucune donnée pour cette sélection.")
         else:
             total_km = 0.0
-            groupes = 0
+            groupes_bat = 0
+            groupes_sec = 0
+            total_missions = len(df_final)
+            
             for agent in agents_sel:
                 df_agt = df_final[df_final['Agent'] == agent].sort_values(['Date_Sort', 'Heure'])
                 for jour in df_agt['Date'].unique():
                     missions_j = df_agt[df_agt['Date'] == jour]
                     prev_coords = BUREAU_GPS
+                    prev_bat = None
+                    prev_sec = None
                     for i, (_, row) in enumerate(missions_j.iterrows()):
                         curr_b = row['Batiment']
+                        curr_sec = trouver_secteur(curr_b)
                         coords = (INFOS_BATIMENTS[curr_b]['lat'], INFOS_BATIMENTS[curr_b]['lon']) if curr_b in INFOS_BATIMENTS else BUREAU_GPS
+                        
                         total_km += calculer_distance(prev_coords, coords)
-                        if i > 0 and curr_b == missions_j.iloc[i-1]['Batiment']:
-                            groupes += 1
-                        prev_coords = coords
+                        if i > 0:
+                            if curr_b == prev_bat:
+                                groupes_bat += 1
+                                groupes_sec += 1
+                            elif curr_sec == prev_sec:
+                                groupes_sec += 1
+                        
+                        prev_coords, prev_bat, prev_sec = coords, curr_b, curr_sec
                     total_km += calculer_distance(prev_coords, BUREAU_GPS)
 
-            tx_opti = (groupes / len(df_final) * 100) if len(df_final) > 0 else 0
+            tx_opti_bat = (groupes_bat / total_missions * 100) if total_missions > 0 else 0
+            tx_opti_sec = (groupes_sec / total_missions * 100) if total_missions > 0 else 0
             nb_entrees = df_final[df_final['Type'].str.contains('Entrée|In', case=False)].shape[0]
             nb_sorties = df_final[df_final['Type'].str.contains('Sortie|Out', case=False)].shape[0]
 
             st.markdown("### 📊 Indicateurs Clés")
             row1 = st.columns(4)
-            row1[0].metric("Total Missions", len(df_final))
-            row1[1].metric("📈 Taux Opti.", f"{tx_opti:.1f}%")
-            row1[2].metric("🚗 Distance Est.", f"{total_km:.1f} km")
-            row1[3].metric("📅 Jours d'activité", df_final['Date'].nunique())
+            row1[0].metric("Total Missions", total_missions)
+            row1[1].metric("🏢 Opti. Bâtiment", f"{tx_opti_bat:.1f}%")
+            row1[2].metric("📍 Opti. Secteur", f"{tx_opti_sec:.1f}%")
+            row1[3].metric("🚗 Distance Est.", f"{total_km:.1f} km")
+            
             row2 = st.columns(4)
             row2[0].metric("📈 Nb Entrées", nb_entrees)
             row2[1].metric("📉 Nb Sorties", nb_sorties)
             row2[2].metric("👥 Agents actifs", len(agents_sel))
-            row2[3].metric("🏠 Bâtiments visités", df_final['Batiment'].nunique())
+            row2[3].metric("📅 Jours d'activité", df_final['Date'].nunique())
             
             st.divider()
             df_chart = df_final.copy()
@@ -254,4 +280,4 @@ with t3:
                     st.map(pd.DataFrame(map_data), size="Missions")
 
 st.divider()
-st.caption(f"v3.9 | {datetime.now().year}")
+st.caption(f"v4.0 | {datetime.now().year}")
