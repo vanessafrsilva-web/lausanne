@@ -22,7 +22,6 @@ if 'db' not in st.session_state:
     st.session_state.db = pd.DataFrame(columns=['Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Type', 'Statut', 'Date_Sort'])
 
 # --- FONCTIONS LOGIQUES ---
-
 def calculer_creneau_securise(agent, date_str, temp_db, batiment_cible, bloc_impose=None, heure_forcee=None):
     m_jour = temp_db[(temp_db['Date'] == date_str) & (temp_db['Agent'] == agent)]
     if heure_forcee:
@@ -49,19 +48,14 @@ def calculer_creneau_securise(agent, date_str, temp_db, batiment_cible, bloc_imp
     except:
         return "08:15", True
 
-# --- INTERFACE (Titre et Logo) ---
-
-col1, col2 = st.columns([1, 3])
-with col1:
-    # Logo de secours via une URL plus stable
-    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/f/f6/CHUV_logo.svg/1200px-CHUV_logo.svg.png", width=180)
-
-with col2:
-    st.title("UNITE LOGEMENT")
-    st.subheader("Gestion du Planning & Optimisation")
-    st.write(f"📍 **Adresse :** {BUREAU}")
-
-st.divider()
+# --- INTERFACE (Titre CHUV Stylisé) ---
+st.markdown(f"""
+    <div style="border-left: 10px solid #0076bd; padding-left: 20px; margin-bottom: 30px;">
+        <h1 style="color: #000000; font-family: sans-serif; margin-bottom: 0px; font-size: 50px; letter-spacing: -1px;">CHUV</h1>
+        <h2 style="color: #555555; font-family: sans-serif; margin-top: 0px; font-weight: 300;">Unité Logement</h2>
+        <p style="color: #888888; font-size: 14px;">📍 {BUREAU}</p>
+    </div>
+""", unsafe_allow_html=True)
 
 t1, t2, t3 = st.tabs(["📝 Planning Global", "📅 Vue par Agent", "📊 Rapports Mensuels"])
 
@@ -95,8 +89,7 @@ with st.sidebar:
             absents = [a.strip().lower().replace('-', ' ') for a in str(row[c_absent]).split(';')] if c_absent and str(row[c_absent]).strip() != "" else []
             presents = [a for a in AGENTS if a.lower().replace('-', ' ') not in absents]
             
-            agt_elu = "⚠️ SANS AGENT"
-            h_finale = h_excel if h_excel else "08:15"
+            agt_elu, h_finale = "⚠️ SANS AGENT", (h_excel if h_excel else "08:15")
             
             if presents:
                 scores = {p: (1 if temp[(temp['Date'] == ds) & (temp['Agent'] == p)].empty else (0 if temp[(temp['Date'] == ds) & (temp['Agent'] == p)].iloc[-1]['Rue'] == rue_demandee else 2)) for p in presents}
@@ -109,8 +102,7 @@ with st.sidebar:
                         agt_elu, h_finale = p, res_h
                         break
                     elif res_h == "⚠️ CONFLIT":
-                        h_finale = "⚠️ CONFLIT"
-                        agt_elu = p
+                        h_finale, agt_elu = "⚠️ CONFLIT", p
             
             temp = pd.concat([temp, pd.DataFrame([{
                 'Batiment': row['Batiment'], 'Date': ds, 'Heure': h_finale, 'Agent': agt_elu, 
@@ -166,3 +158,5 @@ with t3:
         c1.metric("Total", len(df_mois))
         c2.metric("Entrées", df_mois[df_mois['Type'].str.contains('Entrée|In', case=False)].shape[0])
         c3.metric("Sorties", df_mois[df_mois['Type'].str.contains('Sortie|Out', case=False)].shape[0])
+
+st.caption("v2.9 - Présentation Officielle Unité Logement")
