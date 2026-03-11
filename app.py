@@ -179,27 +179,38 @@ with t3:
         with col_left:
             st.subheader("🏠 Volume par bâtiment")
             st.table(stats_bat)
-
-        with col_right:
+with col_right:
             st.subheader("📍 Cartographie")
             map_data = []
             for _, row in stats_bat.iterrows():
                 nom_bat = row['Batiment']
                 if nom_bat in INFOS_BATIMENTS:
                     map_data.append({
-                        'lat': INFOS_BATIMENTS[nom_bat]['lat'],
-                        'lon': INFOS_BATIMENTS[nom_bat]['lon'],
-                        'Missions': int(row['Missions']) # Conversion explicite en int Python
+                        'lat': float(INFOS_BATIMENTS[nom_bat]['lat']),
+                        'lon': float(INFOS_BATIMENTS[nom_bat]['lon']),
+                        'Missions': int(row['Missions'])
                     })
             
             if map_data:
+                # 1. Création du DataFrame
                 df_map = pd.DataFrame(map_data)
-                # Conversion finale pour Streamlit Map
-                df_map['Missions'] = df_map['Missions'].astype(float)
-                st.map(df_map, latitude='lat', longitude='lon', size=df_map['Missions'] * 20, color="#FF4B4B")
+                
+                # 2. Calcul de la taille AVANT st.map pour éviter le calcul interne
+                # On convertit en float Python natif
+                df_map['taille_point'] = (df_map['Missions'] * 20).astype(float)
+                
+                # 3. Affichage avec la colonne de taille déjà calculée
+                st.map(
+                    df_map, 
+                    latitude='lat', 
+                    longitude='lon', 
+                    size='taille_point',  # On passe le nom de la colonne
+                    color="#FF4B4B"
+                )
             else:
-                st.info("Aucune donnée géographique (coordonnées) disponible pour ce mois.")
-    else:
+                st.info("Aucune donnée géographique disponible.")
+
+
         st.info("Veuillez importer des données pour afficher les rapports.")
 
 st.caption("v3.0 - Edition Cartographique")
