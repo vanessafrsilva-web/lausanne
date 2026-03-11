@@ -26,6 +26,7 @@ if 'conges' not in st.session_state:
 # --- FONCTIONS LOGIQUES ---
 
 def est_disponible(agent, date_str):
+    """Vérifie la disponibilité manuelle (via la sidebar)"""
     if st.session_state.conges.empty: return True
     try:
         dt_cible = pd.to_datetime(date_str, dayfirst=True)
@@ -49,11 +50,9 @@ def calculer_creneau_securise(agent, date_str, temp_db, batiment_cible):
 
     try:
         h_obj = datetime.strptime(derniere_h_str, "%H:%M")
-        # Si même adresse : 65min (visite) / Si adresse différente : 80min (visite + trajet)
         delai = 65 if derniere_rue == rue_cible else 80 
         prochaine_h = h_obj + timedelta(minutes=delai)
         
-        # Pause déjeuner (12h-13h)
         if datetime.strptime("12:00", "%H:%M") <= prochaine_h < datetime.strptime("13:00", "%H:%M"):
             prochaine_h = datetime.strptime("13:00", "%H:%M")
             
@@ -88,13 +87,27 @@ with st.sidebar:
         c_date = next((c for c in df_ex.columns if 'date' in c.lower()), 'Date')
         c_heure = next((c for c in df_ex.columns if 'heure' in c.lower()), 'Heure')
         c_type = next((c for c in df_ex.columns if 'type' in c.lower()), 'Type')
+        # Nouvelle détection de la colonne Absent
+        c_absent = next((c for c in df_ex.columns if 'absent' in c.lower()), None)
 
         temp = pd.DataFrame(columns=['Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Type', 'Date_Sort'])
         
         for _, row in df_ex.sort_values(by=[c_date]).iterrows():
             ds = pd.to_datetime(row[c_date]).strftime('%d/%m/%Y')
             rue_demandee = INFOS_BATIMENTS.get(row['Batiment'], "Autre")
-            presents = [a for a in AGENTS if est_disponible(a, ds)]
+            
+            # --- GESTION DES ABSENCES EXCEL ---
+            absents_du_jour = []
+            if c_absent and str(row[c_absent]).strip() != "":
+                # On sépare par ; et on enlève les espaces inutiles
+                absents_du_jour = [a.strip().lower() for a in str(row[c_absent]).split(';')]
+
+            # Filtrage des agents (Dispo manuelle + pas dans la colonne Absent de l'Excel)
+            presents = [
+                a for a in AGENTS 
+                if est_disponible(a, ds) and a.lower() not in absents_du_jour
+            ]
+            
             agt_elu, h_finale = "À définir", "08:15"
             
             if presents:
@@ -131,7 +144,7 @@ with st.sidebar:
         st.session_state.db = pd.DataFrame(columns=['Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Type', 'Date_Sort'])
         st.rerun()
 
-# --- LOGIQUE DES ONGLETS ---
+# --- LOGIQUE DES ONGLETS (Inchangée) ---
 
 with t1:
     if not st.session_state.db.empty:
@@ -176,7 +189,6 @@ with t4:
         df_opti = st.session_state.db.copy()
         suggestions = []
 
-        # 1. Doublons de déplacements (Plusieurs agents au même endroit)
         for date in df_opti['Date'].unique():
             journee = df_opti[df_opti['Date'] == date]
             for bat, rue in INFOS_BATIMENTS.items():
@@ -189,7 +201,6 @@ with t4:
                         "Détail": f"Le **{date}**, {', '.join(agents_sur_place)} se rendent tous à **{bat}**. Vous pourriez regrouper ces missions."
                     })
 
-        # 2. Déséquilibre de charge
         charge = df_opti[df_opti['Agent'] != "À définir"]['Agent'].value_counts()
         for a in AGENTS:
             if a not in charge: charge[a] = 0
@@ -201,13 +212,12 @@ with t4:
                 "Détail": f"**{charge.idxmax()}** a beaucoup plus de missions ({charge.max()}) que **{charge.idxmin()}** ({charge.min()})."
             })
 
-        # 3. Missions non attribuées
         non_attribue = len(df_opti[df_opti['Agent'] == "À définir"])
         if non_attribue > 0:
             suggestions.append({
                 "Type": "Missions en attente",
                 "Priorité": "Critique",
-                "Détail": f"Il reste **{non_attribue}** missions sans agent (conflit d'horaire ou absence)."
+                "Détail": f"Il reste **{non_attribue}** missions sans agent (conflit d'horaire, absence Excel ou congé)."
             })
 
         if suggestions:
