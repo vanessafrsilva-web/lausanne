@@ -23,26 +23,34 @@ if 'db' not in st.session_state:
 
 # --- FONCTIONS LOGIQUES ---
 
-def calculer_creneau_securise(agent, date_str, temp_db, batiment_cible):
+def calculer_creneau_securise(agent, date_str, temp_db, batiment_cible, bloc_impose=None):
     m_jour = temp_db[(temp_db['Date'] == date_str) & (temp_db['Agent'] == agent)]
-    if m_jour.empty: 
-        return "08:15", True
     
-    derniere_m = m_jour.iloc[-1]
-    derniere_h_str = str(derniere_m['Heure']).strip()
-    derniere_rue = derniere_m['Rue']
+    # Définition de l'heure de départ
+    if m_jour.empty:
+        h_depart_str = "08:15" if bloc_impose != "Après-midi" else "13:00"
+    else:
+        derniere_m = m_jour.iloc[-1]
+        h_depart_str = str(derniere_m['Heure']).strip()
+
     rue_cible = INFOS_BATIMENTS.get(batiment_cible, "Autre")
+    derniere_rue = m_jour.iloc[-1]['Rue'] if not m_jour.empty else "Bureau"
 
     try:
-        h_obj = datetime.strptime(derniere_h_str, "%H:%M")
+        h_obj = datetime.strptime(h_depart_str, "%H:%M")
+        # Logique de trajet
         delai = 65 if derniere_rue == rue_cible else 80 
-        prochaine_h = h_obj + timedelta(minutes=delai)
+        prochaine_h = h_obj + timedelta(minutes=delai) if not m_jour.empty else h_obj
         
+        # Gestion pause midi
         if datetime.strptime("12:00", "%H:%M") <= prochaine_h < datetime.strptime("13:00", "%H:%M"):
             prochaine_h = datetime.strptime("13:00", "%H:%M")
-            
+        
+        # Vérification des limites de blocs (Option Optimisée)
+        if bloc_impose == "Matin" and prochaine_h > datetime.strptime("11:30", "%H:%M"):
+            return "COMPLET MATIN", False
         if prochaine_h > datetime.strptime("16:15", "%H:%M"):
-            return "COMPLET", False
+            return "COMPLET JOUR", False
             
         return prochaine_h.strftime("%H:%M"), True
     except:
@@ -50,6 +58,7 @@ def calculer_creneau_securise(agent, date_str, temp_db, batiment_cible):
 
 # --- INTERFACE PRINCIPALE ---
 st.title("📍 Unité Logement : Planning & Rapports")
+st.info("💡 **Conseil pour la démo :** Testez l'option 'Optimisée par blocs' pour voir comment l'IA regroupe les missions.")
 
 t1, t2, t3 = st.tabs(["📝 Planning Global", "📅 Vue par Agent", "📊 Rapports Mensuels"])
 
@@ -57,6 +66,11 @@ with st.sidebar:
     st.header("📂 Importation")
     up = st.file_uploader("Fichier Excel des missions", type=['xlsx'])
     
+    st.subheader("⚙️ Options d'attribution")
+    mode_ia = st.radio("Choisir la méthode :", 
+                       ["Respecter l'heure de l'Excel (Fixe)", 
+                        "Optimiser par blocs (Matin / Après-midi)"])
+
     if up and st.button("🚀 Lancer l'Attribution"):
         df_ex = pd.read_excel(up).dropna(how='all').fillna('')
         df_ex.columns = df_ex.columns.str.strip()
@@ -73,43 +87,47 @@ with st.sidebar:
             dt_raw = pd.to_datetime(row[c_date])
             ds = dt_raw.strftime('%d/%m/%Y')
             rue_demandee = INFOS_BATIMENTS.get(row['Batiment'], "Autre")
-            
+            statut_val = str(row[c_statut]).strip()
+
+            # Identification du bloc souhaité
+            bloc = None
+            if "matin" in statut_val.lower(): bloc = "Matin"
+            elif "midi" in statut_val.lower(): bloc = "Après-midi"
+
+            # Gestion absences
             absents_du_jour = []
             if c_absent and str(row[c_absent]).strip() != "":
                 absents_du_jour = [a.strip().lower().replace('-', ' ') for a in str(row[c_absent]).split(';')]
-
             presents = [a for a in AGENTS if a.lower().replace('-', ' ') not in absents_du_jour]
             
             agt_elu, h_finale = "À définir", "08:15"
             
             if presents:
+                # Calcul intelligent de l'agent
                 scores = {p: (1 if temp[(temp['Date'] == ds) & (temp['Agent'] == p)].empty else (0 if temp[(temp['Date'] == ds) & (temp['Agent'] == p)].iloc[-1]['Rue'] == rue_demandee else 2)) for p in presents}
                 presents_tries = sorted(presents, key=lambda x: (scores[x], len(temp[(temp['Date'] == ds) & (temp['Agent'] == x)])))
                 
                 for p in presents_tries:
-                    heure_suggere, possible = calculer_creneau_securise(p, ds, temp, row['Batiment'])
+                    h_suggere, possible = calculer_creneau_securise(p, ds, temp, row['Batiment'], bloc_impose=bloc)
                     if possible:
-                        agt_elu, h_finale = p, heure_suggere
+                        agt_elu, h_finale = p, h_suggere
                         break
             
-            h_val = str(row[c_heure]).strip()
-            if h_val not in ["", "nan", "00:00:00", "libre"]: h_finale = h_val[:5]
-
-            statut_val = str(row[c_statut]).strip() if c_statut in row else ""
+            # Si mode Fixe, on écrase par l'heure Excel
+            if "Fixe" in mode_ia:
+                h_excel = str(row[c_heure]).strip()
+                if h_excel not in ["", "nan", "00:00:00", "libre"]: h_finale = h_excel[:5]
 
             temp = pd.concat([temp, pd.DataFrame([{
                 'Batiment': row['Batiment'], 'Date': ds, 'Heure': h_finale, 'Agent': agt_elu, 
-                'Type': row[c_type], 'Rue': rue_demandee, 'Statut': statut_val,
-                'Date_Sort': dt_raw
+                'Type': row[c_type], 'Rue': rue_demandee, 'Statut': statut_val, 'Date_Sort': dt_raw
             }])], ignore_index=True)
             
         st.session_state.db = temp
         st.rerun()
 
     st.divider()
-    st.header("🔍 Filtres d'affichage")
-    filtre_souhaits = st.toggle("Afficher uniquement les souhaits locataires", value=False)
-
+    filtre_souhaits = st.toggle("Voir uniquement les demandes locataires")
     if st.button("🗑️ Reset Complet"):
         st.session_state.db = pd.DataFrame(columns=['Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Type', 'Statut', 'Date_Sort'])
         st.rerun()
@@ -119,22 +137,16 @@ with st.sidebar:
 with t1:
     if not st.session_state.db.empty:
         df_v = st.session_state.db.sort_values(['Date_Sort', 'Heure'])
-        
-        # Application du filtre si activé
         if filtre_souhaits:
-            df_v = df_v[df_v['Statut'].str.lower() == "souhaité"]
-            st.info(f"Affichage de {len(df_v)} rendez-vous souhaités.")
-
+            df_v = df_v[df_v['Statut'] != ""]
+        
         def highlight_souhait(s):
             color = COULEURS.get(s['Agent'], "#eeeeee")
-            if str(s['Statut']).lower() == "souhaité":
+            if s['Statut'] != "":
                 return [f'background-color: {color}; font-weight: bold; border: 2px solid orange']*7
             return [f'background-color: {color}']*7
 
-        st.dataframe(
-            df_v[['Date', 'Statut', 'Heure', 'Agent', 'Batiment', 'Type', 'Rue']].style.apply(highlight_souhait, axis=1),
-            use_container_width=True, height=500
-        )
+        st.dataframe(df_v[['Date', 'Statut', 'Heure', 'Agent', 'Batiment', 'Type', 'Rue']].style.apply(highlight_souhait, axis=1), use_container_width=True, height=500)
 
 with t2:
     if not st.session_state.db.empty:
@@ -144,13 +156,9 @@ with t2:
             with cols[i]:
                 st.markdown(f"<div style='text-align:center; background-color:{COULEURS[a]}; padding:10px; border-radius:5px; color:black; font-weight:bold;'>{a}</div>", unsafe_allow_html=True)
                 m = st.session_state.db[(st.session_state.db['Date'] == sel_j) & (st.session_state.db['Agent'] == a)].sort_values('Heure')
-                if m.empty: st.caption("Aucune mission")
-                else:
-                    for _, r in m.iterrows():
-                        if str(r['Statut']).lower() == "souhaité":
-                            st.warning(f"🗓️ **{r['Heure']}** (Souhait)\n\n**{r['Batiment']}**\n\n*{r['Type']}*")
-                        else:
-                            st.info(f"🕒 **{r['Heure']}**\n\n**{r['Batiment']}**\n\n*{r['Type']}*")
+                for _, r in m.iterrows():
+                    box = st.warning if r['Statut'] != "" else st.info
+                    box(f"🕒 **{r['Heure']}**\n\n**{r['Batiment']}**\n\n*{r['Type']}*")
 
 with t3:
     st.markdown("<style>[data-testid='stMetricValue'], [data-testid='stMetricLabel'], .stMarkdown p, h3 {color: black !important;} table td, table th {color: black !important; font-weight: 500 !important;} .stTable {color: black !important;}</style>", unsafe_allow_html=True)
@@ -158,19 +166,14 @@ with t3:
     if not st.session_state.db.empty:
         df_rep = st.session_state.db.copy()
         df_rep['Mois'] = df_rep['Date_Sort'].dt.strftime('%B %Y')
-        liste_mois = df_rep['Mois'].unique()
-        mois_sel = st.selectbox("Choisir le mois :", liste_mois)
+        mois_sel = st.selectbox("Choisir le mois :", df_rep['Mois'].unique())
         df_mois = df_rep[df_rep['Mois'] == mois_sel]
-        
-        entrees = df_mois[df_mois['Type'].str.contains('Entrée|entree|In', case=False)].shape[0]
-        sorties = df_mois[df_mois['Type'].str.contains('Sortie|sortie|Out', case=False)].shape[0]
         
         c1, c2, c3 = st.columns(3)
         c1.metric("Total Missions", len(df_mois))
-        c2.metric("📈 Entrées", entrees)
-        c3.metric("📉 Sorties", sorties)
+        c2.metric("📈 Entrées", df_mois[df_mois['Type'].str.contains('Entrée|In', case=False)].shape[0])
+        c3.metric("📉 Sorties", df_mois[df_mois['Type'].str.contains('Sortie|Out', case=False)].shape[0])
         
-        st.divider()
         col_left, col_right = st.columns(2)
         with col_left:
             st.write("**Missions par Agent**")
@@ -181,7 +184,7 @@ with t3:
             stats_bat.columns = ['Bâtiment', 'Total']
             st.table(stats_bat.set_index('Bâtiment'))
     else:
-        st.info("Importez des données pour générer les rapports.")
+        st.info("Importez des données.")
 
 st.divider()
-st.caption("v2.3 - Unité Logement")
+st.caption("v2.4 - Démo Cheffe Unité Logement")
