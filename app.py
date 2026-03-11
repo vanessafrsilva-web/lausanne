@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 
 # --- CONFIGURATION FIXE ---
-BUREAU = "Chemin Mont Paisible 18, 1005 Lausanne"
+BUREAU = "18 Mon Repos, 1005 Lausanne"
 AGENTS = ["Celine", "Maria Claret", "Maria Elisabeth"]
 INFOS_BATIMENTS = {
     'Bethusy A': 'Avenue de Béthusy 54, Lausanne',
@@ -19,7 +19,7 @@ st.set_page_config(page_title="Unité Logement - Gestion Planning", layout="wide
 
 # Initialisation
 if 'db' not in st.session_state:
-    st.session_state.db = pd.DataFrame(columns=['Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Type', 'Date_Sort'])
+    st.session_state.db = pd.DataFrame(columns=['Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Type', 'Statut', 'Date_Sort'])
 
 # --- FONCTIONS LOGIQUES ---
 
@@ -35,7 +35,6 @@ def calculer_creneau_securise(agent, date_str, temp_db, batiment_cible):
 
     try:
         h_obj = datetime.strptime(derniere_h_str, "%H:%M")
-        # Si même adresse : 65min / Si adresse différente : 80min
         delai = 65 if derniere_rue == rue_cible else 80 
         prochaine_h = h_obj + timedelta(minutes=delai)
         
@@ -56,7 +55,7 @@ t1, t2, t3 = st.tabs(["📝 Planning Global", "📅 Vue par Agent", "📊 Rappor
 
 with st.sidebar:
     st.header("📂 Importation")
-    st.info("Gestion des absences : Ajoutez une colonne 'Absent' dans votre Excel (ex: Celine ; Maria Claret)")
+    st.info("**Nouveau :** Utilisez la colonne 'Statut' avec la valeur 'Souhaité' pour marquer les demandes locataires.")
     up = st.file_uploader("Fichier Excel des missions", type=['xlsx'])
     
     if up and st.button("🚀 Lancer l'Attribution"):
@@ -67,15 +66,16 @@ with st.sidebar:
         c_heure = next((c for c in df_ex.columns if 'heure' in c.lower()), 'Heure')
         c_type = next((c for c in df_ex.columns if 'type' in c.lower()), 'Type')
         c_absent = next((c for c in df_ex.columns if 'absent' in c.lower()), None)
+        c_statut = next((c for c in df_ex.columns if 'statut' in c.lower()), 'Statut')
 
-        temp = pd.DataFrame(columns=['Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Type', 'Date_Sort'])
+        temp = pd.DataFrame(columns=['Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Type', 'Statut', 'Date_Sort'])
         
         for _, row in df_ex.sort_values(by=[c_date]).iterrows():
             dt_raw = pd.to_datetime(row[c_date])
             ds = dt_raw.strftime('%d/%m/%Y')
             rue_demandee = INFOS_BATIMENTS.get(row['Batiment'], "Autre")
             
-            # Logique d'absence Excel robuste (insensible à la casse, espaces et tirets)
+            # Gestion absences
             absents_du_jour = []
             if c_absent and str(row[c_absent]).strip() != "":
                 absents_du_jour = [a.strip().lower().replace('-', ' ') for a in str(row[c_absent]).split(';')]
@@ -97,9 +97,12 @@ with st.sidebar:
             h_val = str(row[c_heure]).strip()
             if h_val not in ["", "nan", "00:00:00", "libre"]: h_finale = h_val[:5]
 
+            # Récupération du statut
+            statut_val = str(row[c_statut]).strip() if c_statut in row else ""
+
             temp = pd.concat([temp, pd.DataFrame([{
                 'Batiment': row['Batiment'], 'Date': ds, 'Heure': h_finale, 'Agent': agt_elu, 
-                'Type': row[c_type], 'Rue': rue_demandee, 
+                'Type': row[c_type], 'Rue': rue_demandee, 'Statut': statut_val,
                 'Date_Sort': dt_raw
             }])], ignore_index=True)
             
@@ -107,18 +110,25 @@ with st.sidebar:
         st.rerun()
 
     if st.button("🗑️ Reset Complet"):
-        st.session_state.db = pd.DataFrame(columns=['Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Type', 'Date_Sort'])
+        st.session_state.db = pd.DataFrame(columns=['Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Type', 'Statut', 'Date_Sort'])
         st.rerun()
 
 # --- ONGLETS ---
 
 with t1:
     if not st.session_state.db.empty:
+        st.write("💡 *Les lignes en italique avec (S) indiquent un souhait locataire.*")
         df_v = st.session_state.db.sort_values(['Date_Sort', 'Heure'])
+        
+        def highlight_souhait(s):
+            color = COULEURS.get(s['Agent'], "#eeeeee")
+            if str(s['Statut']).lower() == "souhaité":
+                return [f'background-color: {color}; font-weight: bold; border: 2px solid orange']*7
+            return [f'background-color: {color}']*7
+
         st.dataframe(
-            df_v[['Date', 'Heure', 'Agent', 'Batiment', 'Type', 'Rue']].style.apply(
-                lambda r: [f'background-color: {COULEURS.get(r["Agent"])}']*6, axis=1
-            ), use_container_width=True, height=500
+            df_v[['Date', 'Heure', 'Agent', 'Batiment', 'Type', 'Statut', 'Rue']].style.apply(highlight_souhait, axis=1),
+            use_container_width=True, height=500
         )
 
 with t2:
@@ -132,64 +142,41 @@ with t2:
                 if m.empty: st.caption("Aucune mission")
                 else:
                     for _, r in m.iterrows():
-                        st.info(f"🕒 **{r['Heure']}**\n\n**{r['Batiment']}**\n\n*{r['Type']}*")
+                        if str(r['Statut']).lower() == "souhaité":
+                            st.warning(f"🗓️ **{r['Heure']}** (Souhait)\n\n**{r['Batiment']}**\n\n*{r['Type']}*")
+                        else:
+                            st.info(f"🕒 **{r['Heure']}**\n\n**{r['Batiment']}**\n\n*{r['Type']}*")
 
 with t3:
-    # --- CSS POUR FORCER LE NOIR (TABLEAUX ET TEXTES) ---
-    st.markdown("""
-        <style>
-        /* Force le noir sur les métriques et titres */
-        [data-testid="stMetricValue"], [data-testid="stMetricLabel"], .stMarkdown p, h3 {
-            color: black !important;
-        }
-        /* Force le noir sur les cellules et entêtes des tableaux */
-        table td, table th {
-            color: black !important;
-            font-weight: 500 !important;
-        }
-        /* Suppression de la transparence Streamlit sur les tableaux */
-        .stTable {
-            color: black !important;
-        }
-        </style>
-    """, unsafe_allow_html=True)
-
+    st.markdown("<style>[data-testid='stMetricValue'], [data-testid='stMetricLabel'], .stMarkdown p, h3 {color: black !important;} table td, table th {color: black !important; font-weight: 500 !important;} .stTable {color: black !important;}</style>", unsafe_allow_html=True)
     st.subheader("📊 Rapports d'activité")
     if not st.session_state.db.empty:
         df_rep = st.session_state.db.copy()
         df_rep['Mois'] = df_rep['Date_Sort'].dt.strftime('%B %Y')
-        
         liste_mois = df_rep['Mois'].unique()
-        mois_sel = st.selectbox("Choisir le mois à analyser :", liste_mois)
-        
+        mois_sel = st.selectbox("Choisir le mois :", liste_mois)
         df_mois = df_rep[df_rep['Mois'] == mois_sel]
         
-        # Calcul Entrées / Sorties
         entrees = df_mois[df_mois['Type'].str.contains('Entrée|entree|In', case=False)].shape[0]
         sorties = df_mois[df_mois['Type'].str.contains('Sortie|sortie|Out', case=False)].shape[0]
-        total = len(df_mois)
         
         c1, c2, c3 = st.columns(3)
-        c1.metric("Total Missions", total)
+        c1.metric("Total Missions", len(df_mois))
         c2.metric("📈 Entrées", entrees)
         c3.metric("📉 Sorties", sorties)
         
         st.divider()
-        
         col_left, col_right = st.columns(2)
         with col_left:
             st.write("**Missions par Agent**")
             st.bar_chart(df_mois['Agent'].value_counts())
-        
         with col_right:
             st.write("**Répartition par Bâtiment**")
-            # Tableau avec titre "Total"
             stats_bat = df_mois['Batiment'].value_counts().reset_index()
             stats_bat.columns = ['Bâtiment', 'Total']
             st.table(stats_bat.set_index('Bâtiment'))
-            
     else:
-        st.info("Veuillez importer des données pour voir les rapports.")
+        st.info("Importez des données.")
 
 st.divider()
-st.caption("Système de gestion de planning v2.1 - Unité Logement")
+st.caption("v2.2 - Unité Logement")
