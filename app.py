@@ -171,17 +171,15 @@ with t3:
         
         col_f1, col_f2 = st.columns(2)
         mois_sel = col_f1.selectbox("📅 Choisir le Mois :", df_rep['Mois'].unique())
-        
-        # Correction : On force la sélection des agents pour être sûr d'avoir des chiffres
         options_agents = [a for a in df_rep['Agent'].unique() if a != "⚠️ SANS AGENT"]
         agents_sel = col_f2.multiselect("👤 Sélectionner Agents :", options_agents, default=options_agents)
         
         df_final = df_rep[(df_rep['Mois'] == mois_sel) & (df_rep['Agent'].isin(agents_sel))]
 
         if df_final.empty:
-            st.warning("Aucune donnée pour cette sélection (Mois/Agents).")
+            st.warning("Aucune donnée pour cette sélection.")
         else:
-            # --- CALCULS ---
+            # CALCULS
             total_km = 0.0
             groupes = 0
             for agent in agents_sel:
@@ -199,13 +197,22 @@ with t3:
                     total_km += calculer_distance(prev_coords, BUREAU_GPS)
 
             tx_opti = (groupes / len(df_final) * 100) if len(df_final) > 0 else 0
+            nb_entrees = df_final[df_final['Type'].str.contains('Entrée|In', case=False)].shape[0]
+            nb_sorties = df_final[df_final['Type'].str.contains('Sortie|Out', case=False)].shape[0]
 
-            # --- AFFICHAGE METRICS ---
-            m1, m2, m3, m4 = st.columns(4)
-            m1.metric("Missions", len(df_final))
-            m2.metric("📈 Taux Opti.", f"{tx_opti:.1f}%")
-            m3.metric("🚗 Est. Trajets", f"{total_km:.1f} km")
-            m4.metric("📅 Jours", df_final['Date'].nunique())
+            # AFFICHAGE METRICS (2 lignes de 4 colonnes pour la clarté)
+            st.markdown("### 📊 Indicateurs Clés")
+            row1 = st.columns(4)
+            row1[0].metric("Total Missions", len(df_final))
+            row1[1].metric("📈 Taux Opti.", f"{tx_opti:.1f}%", help="Missions enchaînées sur un même lieu")
+            row1[2].metric("🚗 Distance Est.", f"{total_km:.1f} km")
+            row1[3].metric("📅 Jours d'activité", df_final['Date'].nunique())
+            
+            row2 = st.columns(4)
+            row2[0].metric("📈 Nb Entrées", nb_entrees)
+            row2[1].metric("📉 Nb Sorties", nb_sorties)
+            row2[2].metric("👥 Agents actifs", len(agents_sel))
+            row2[3].metric("🏠 Bâtiments visités", df_final['Batiment'].nunique())
             
             st.divider()
             
@@ -215,7 +222,7 @@ with t3:
             df_chart['Nom_Semaine'] = "Semaine " + df_chart['Semaine'].astype(str)
             fig = px.histogram(df_chart.sort_values('Semaine'), x='Nom_Semaine', color='Agent', 
                                color_discrete_map=COULEURS, barmode='group', text_auto=True,
-                               title="Volume de missions par semaine")
+                               title="Répartition des missions par semaine")
             st.plotly_chart(fig, use_container_width=True)
 
             cl, cr = st.columns(2)
@@ -224,12 +231,10 @@ with t3:
                 st.table(df_final.groupby('Batiment').size().reset_index(name='Missions').sort_values('Missions', ascending=False))
             with cr:
                 st.subheader("📍 Carte")
-                map_data = []
-                for b, count in df_final.groupby('Batiment').size().items():
-                    if b in INFOS_BATIMENTS:
-                        map_data.append({'lat': INFOS_BATIMENTS[b]['lat'], 'lon': INFOS_BATIMENTS[b]['lon'], 'Missions': count})
+                map_data = [{'lat': INFOS_BATIMENTS[b]['lat'], 'lon': INFOS_BATIMENTS[b]['lon'], 'Missions': count} 
+                            for b, count in df_final.groupby('Batiment').size().items() if b in INFOS_BATIMENTS]
                 if map_data:
                     st.map(pd.DataFrame(map_data))
 
 st.divider()
-st.caption(f"v3.6 | {datetime.now().year}")
+st.caption(f"v3.7 | {datetime.now().year}")
