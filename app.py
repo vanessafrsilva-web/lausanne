@@ -178,7 +178,7 @@ with t3:
             stats_bat = df_mois.groupby('Batiment').size().reset_index(name='Missions').sort_values('Missions', ascending=False)
             st.table(stats_bat)
 
-        with col_right:
+  with col_right:
             st.subheader("📍 Cartographie")
             map_data = []
             for _, row in stats_bat.iterrows():
@@ -186,11 +186,14 @@ with t3:
                     map_data.append({
                         'lat': INFOS_BATIMENTS[row['Batiment']]['lat'],
                         'lon': INFOS_BATIMENTS[row['Batiment']]['lon'],
-                        'Missions': row['Missions']
+                        # CONVERSION ICI : on force le type int natif ou float
+                        'Missions': int(row['Missions']) 
                     })
             if map_data:
                 df_map = pd.DataFrame(map_data)
-                # Taille des points basée sur le nombre de missions
+                # On s'assure aussi que la colonne dans le DF est bien convertie
+                df_map['Missions'] = df_map['Missions'].astype(float) 
+                
                 st.map(df_map, latitude='lat', longitude='lon', size=df_map['Missions'] * 20, color="#FF4B4B")
             else:
                 st.info("Aucune donnée géographique à afficher.")
