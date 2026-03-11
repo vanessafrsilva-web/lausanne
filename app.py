@@ -3,7 +3,6 @@ import pandas as pd
 from datetime import datetime, timedelta
 
 # --- CONFIGURATION FIXE ---
-# MISE À JOUR DE L'ADRESSE
 BUREAU = "Chemin Mont-Paisible 18, 1011 Lausanne"
 AGENTS = ["Celine", "Maria Claret", "Maria Elisabeth"]
 INFOS_BATIMENTS = {
@@ -154,15 +153,38 @@ with t2:
             for _, r in non_attrib.iterrows(): st.write(f"❌ {r['Batiment']} ({r['Type']})")
 
 with t3:
-    st.markdown("<style>[data-testid='stMetricValue'], [data-testid='stMetricLabel'], .stMarkdown p, h3 {color: black !important;} table td, table th {color: black !important; font-weight: 500 !important;} .stTable {color: black !important;}</style>", unsafe_allow_html=True)
+    # Styles pour forcer le noir sur les métriques et les tableaux
+    st.markdown("""
+        <style>
+        [data-testid="stMetricValue"], [data-testid="stMetricLabel"], .stMarkdown p {color: black !important;}
+        .stTable td, .stTable th {color: black !important; font-weight: 600 !important; font-size: 1.05rem !important;}
+        </style>
+    """, unsafe_allow_html=True)
+
     if not st.session_state.db.empty:
         df_rep = st.session_state.db.copy()
         df_rep['Mois'] = df_rep['Date_Sort'].dt.strftime('%B %Y')
         mois_sel = st.selectbox("Choisir le mois :", df_rep['Mois'].unique())
         df_mois = df_rep[df_rep['Mois'] == mois_sel]
+        
+        # --- RÉSUMÉ ---
         c1, c2, c3 = st.columns(3)
         c1.metric("Total Missions", len(df_mois))
         c2.metric("📈 Entrées", df_mois[df_mois['Type'].str.contains('Entrée|In', case=False)].shape[0])
         c3.metric("📉 Sorties", df_mois[df_mois['Type'].str.contains('Sortie|Out', case=False)].shape[0])
+        
+        st.divider()
+        
+        # --- ÉTATS DES LIEUX PAR BÂTIMENT ---
+        st.subheader(f"🏠 Volume par bâtiment ({mois_sel})")
+        
+        # Groupement par bâtiment et tri par volume
+        stats_bat = df_mois.groupby('Batiment').size().reset_index(name='Nombre de missions')
+        stats_bat = stats_bat.sort_values(by='Nombre de missions', ascending=False)
+        
+        # Affichage du tableau (le CSS ci-dessus force le texte en noir)
+        st.table(stats_bat)
+    else:
+        st.info("Veuillez importer des données dans le menu latéral pour générer le rapport.")
 
-st.caption("v2.7 - Démo Cheffe Unité Logement")
+st.caption("v2.8 - Démo Cheffe Unité Logement")
