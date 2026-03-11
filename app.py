@@ -29,7 +29,8 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 if 'db' not in st.session_state:
-    st.session_state.db = pd.DataFrame(columns=['Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Type', 'Statut', 'Date_Sort'])
+    # AJOUT DE LA COLONNE ID DANS LA STRUCTURE INITIALE
+    st.session_state.db = pd.DataFrame(columns=['ID', 'Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Type', 'Statut', 'Date_Sort'])
 
 # --- FONCTIONS LOGIQUES ---
 def calculer_creneau_securise(agent, date_str, temp_db, batiment_cible, bloc_impose=None, heure_forcee=None):
@@ -79,13 +80,16 @@ with st.sidebar:
             try:
                 df_ex = pd.read_excel(up).dropna(how='all').fillna('')
                 df_ex.columns = df_ex.columns.str.strip()
+                
+                # IDENTIFICATION DES COLONNES
+                c_id = next((c for c in df_ex.columns if 'id' in c.lower() or 'n°' in c.lower()), df_ex.columns[0])
                 c_date = next((c for c in df_ex.columns if 'date' in c.lower()), 'Date')
                 c_heure = next((c for c in df_ex.columns if 'heure' in c.lower()), 'Heure')
                 c_type = next((c for c in df_ex.columns if 'type' in c.lower()), 'Type')
                 c_absent = next((c for c in df_ex.columns if 'absent' in c.lower()), None)
                 c_statut = next((c for c in df_ex.columns if 'statut' in c.lower()), 'Statut')
 
-                temp = pd.DataFrame(columns=['Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Type', 'Statut', 'Date_Sort'])
+                temp = pd.DataFrame(columns=['ID', 'Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Type', 'Statut', 'Date_Sort'])
                 df_ex_sorted = df_ex.copy()
                 df_ex_sorted[c_date] = pd.to_datetime(df_ex_sorted[c_date])
                 df_ex_sorted = df_ex_sorted.sort_values(by=[c_date, c_heure])
@@ -115,6 +119,7 @@ with st.sidebar:
                                 agt_elu, h_finale = p, "⚠️ CONFLIT"
 
                     temp = pd.concat([temp, pd.DataFrame([{
+                        'ID': row[c_id], # STOCKAGE DE L'ID
                         'Batiment': row['Batiment'], 'Date': ds, 'Heure': h_finale, 'Agent': agt_elu, 
                         'Type': row[c_type], 'Rue': rue_demandee, 'Statut': statut_val, 'Date_Sort': dt_raw
                     }])], ignore_index=True)
@@ -131,7 +136,7 @@ with st.sidebar:
             df_export.to_excel(writer, index=False)
         st.download_button("📥 Télécharger Excel", output.getvalue(), "Planning.xlsx")
         if st.button("🗑️ Reset"):
-            st.session_state.db = pd.DataFrame(columns=['Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Type', 'Statut', 'Date_Sort'])
+            st.session_state.db = pd.DataFrame(columns=['ID', 'Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Type', 'Statut', 'Date_Sort'])
             st.rerun()
 
 # --- ONGLETS ---
@@ -139,11 +144,12 @@ with t1:
     if not st.session_state.db.empty:
         df_v = st.session_state.db.sort_values(['Date_Sort', 'Heure'])
         def style_row(s):
-            if s['Heure'] == "⚠️ CONFLIT": return ['background-color: #ffcccc; color: #cc0000; font-weight: bold']*7
+            if s['Heure'] == "⚠️ CONFLIT": return ['background-color: #ffcccc; color: #cc0000; font-weight: bold']*8
             color = COULEURS.get(s['Agent'], "#eeeeee")
-            if str(s['Statut']).strip() != "": return [f'background-color: {color}; border: 2px solid #ff9933']*7
-            return [f'background-color: {color}; color: black']*7
-        st.dataframe(df_v[['Date', 'Statut', 'Heure', 'Agent', 'Batiment', 'Type', 'Rue']].style.apply(style_row, axis=1), use_container_width=True, height=500)
+            if str(s['Statut']).strip() != "": return [f'background-color: {color}; border: 2px solid #ff9933']*8
+            return [f'background-color: {color}; color: black']*8
+        # AFFICHAGE DE LA COLONNE ID DANS LE TABLEAU
+        st.dataframe(df_v[['ID', 'Date', 'Statut', 'Heure', 'Agent', 'Batiment', 'Type', 'Rue']].style.apply(style_row, axis=1), use_container_width=True, height=500)
 
 with t2:
     if not st.session_state.db.empty:
@@ -155,7 +161,8 @@ with t2:
                 m = st.session_state.db[(st.session_state.db['Date'] == sel_j) & (st.session_state.db['Agent'] == a)].sort_values('Heure')
                 for _, r in m.iterrows():
                     color = "#ffcccc" if r['Heure'] == "⚠️ CONFLIT" else COULEURS[a]
-                    st.markdown(f"<div style='background-color:{color}; padding:8px; border-radius:5px; border:1px solid #ccc; color:black; margin-top:5px;'>🕒 <b>{r['Heure']}</b><br>🏠 {r['Batiment']}</div>", unsafe_allow_html=True)
+                    # AFFICHAGE DE L'ID DANS LES CARTES AGENTS
+                    st.markdown(f"<div style='background-color:{color}; padding:8px; border-radius:5px; border:1px solid #ccc; color:black; margin-top:5px;'>🆔 <b>{r['ID']}</b><br>🕒 <b>{r['Heure']}</b><br>🏠 {r['Batiment']}</div>", unsafe_allow_html=True)
 
 with t3:
     if not st.session_state.db.empty:
@@ -196,4 +203,4 @@ with t3:
                        for b, count in df_final.groupby('Batiment').size().items() if b in INFOS_BATIMENTS]))
 
 st.divider()
-st.caption(f"v3.2 | {datetime.now().year}")
+st.caption(f"v3.3 | {datetime.now().year}")
