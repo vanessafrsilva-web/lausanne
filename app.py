@@ -3,9 +3,12 @@ import pandas as pd
 from datetime import datetime, timedelta
 import io
 import plotly.express as px
+import numpy as np
 
 # --- CONFIGURATION ---
-BUREAU = "Chemin Mont-Paisible 18, 1011 Lausanne"
+# Mise à jour de l'adresse et des coordonnées GPS (Mont-Paisible 18)
+BUREAU_ADRESSE = "Chemin Mont-Paisible 18, 1011 Lausanne"
+BUREAU_GPS = (46.5332, 6.6135) 
 AGENTS = ["Celine", "Maria Claret", "Maria Elisabeth"]
 
 INFOS_BATIMENTS = {
@@ -21,15 +24,19 @@ COULEURS = {"Celine": "#d1e9ff", "Maria Claret": "#ffdae0", "Maria Elisabeth": "
 
 st.set_page_config(page_title="Unité Logement - Gestion Planning", layout="wide", page_icon="📍")
 
-st.markdown("""
-    <style>
-    [data-testid="stNotification"] { padding: 8px; margin-bottom: 2px; }
-    .dataframe { font-size: 12px; }
-    </style>
-    """, unsafe_allow_html=True)
+# --- FONCTION DISTANCE (Haversine) ---
+def calculer_distance(pos1, pos2):
+    if not pos1 or not pos2: return 0
+    R = 6371.0 # Rayon de la Terre en km
+    lat1, lon1 = np.radians(pos1[0]), np.radians(pos1[1])
+    lat2, lon2 = np.radians(pos2[0]), np.radians(pos2[1])
+    dlon = lon2 - lon1
+    dlat = lat2 - lat1
+    a = np.sin(dlat / 2)**2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon / 2)**2
+    c = 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
+    return R * c
 
 if 'db' not in st.session_state:
-    # AJOUT DE LA COLONNE ID DANS LA STRUCTURE INITIALE
     st.session_state.db = pd.DataFrame(columns=['ID', 'Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Type', 'Statut', 'Date_Sort'])
 
 # --- FONCTIONS LOGIQUES ---
@@ -66,7 +73,7 @@ def calculer_creneau_securise(agent, date_str, temp_db, batiment_cible, bloc_imp
 
 # --- INTERFACE ---
 st.title("📍 Unité Logement : Planning & Rapports")
-st.caption(f"📍 Siège social : {BUREAU}")
+st.caption(f"📍 Siège social : {BUREAU_ADRESSE}")
 
 t1, t2, t3 = st.tabs(["📝 Planning Global", "📅 Vue par Agent", "📊 Rapports & Analyses"])
 
@@ -80,8 +87,6 @@ with st.sidebar:
             try:
                 df_ex = pd.read_excel(up).dropna(how='all').fillna('')
                 df_ex.columns = df_ex.columns.str.strip()
-                
-                # IDENTIFICATION DES COLONNES
                 c_id = next((c for c in df_ex.columns if 'id' in c.lower() or 'n°' in c.lower()), df_ex.columns[0])
                 c_date = next((c for c in df_ex.columns if 'date' in c.lower()), 'Date')
                 c_heure = next((c for c in df_ex.columns if 'heure' in c.lower()), 'Heure')
@@ -119,8 +124,7 @@ with st.sidebar:
                                 agt_elu, h_finale = p, "⚠️ CONFLIT"
 
                     temp = pd.concat([temp, pd.DataFrame([{
-                        'ID': row[c_id], # STOCKAGE DE L'ID
-                        'Batiment': row['Batiment'], 'Date': ds, 'Heure': h_finale, 'Agent': agt_elu, 
+                        'ID': row[c_id], 'Batiment': row['Batiment'], 'Date': ds, 'Heure': h_finale, 'Agent': agt_elu, 
                         'Type': row[c_type], 'Rue': rue_demandee, 'Statut': statut_val, 'Date_Sort': dt_raw
                     }])], ignore_index=True)
                 st.session_state.db = temp
@@ -148,7 +152,6 @@ with t1:
             color = COULEURS.get(s['Agent'], "#eeeeee")
             if str(s['Statut']).strip() != "": return [f'background-color: {color}; border: 2px solid #ff9933']*8
             return [f'background-color: {color}; color: black']*8
-        # AFFICHAGE DE LA COLONNE ID DANS LE TABLEAU
         st.dataframe(df_v[['ID', 'Date', 'Statut', 'Heure', 'Agent', 'Batiment', 'Type', 'Rue']].style.apply(style_row, axis=1), use_container_width=True, height=500)
 
 with t2:
@@ -161,7 +164,6 @@ with t2:
                 m = st.session_state.db[(st.session_state.db['Date'] == sel_j) & (st.session_state.db['Agent'] == a)].sort_values('Heure')
                 for _, r in m.iterrows():
                     color = "#ffcccc" if r['Heure'] == "⚠️ CONFLIT" else COULEURS[a]
-                    # AFFICHAGE DE L'ID DANS LES CARTES AGENTS
                     st.markdown(f"<div style='background-color:{color}; padding:8px; border-radius:5px; border:1px solid #ccc; color:black; margin-top:5px;'>🆔 <b>{r['ID']}</b><br>🕒 <b>{r['Heure']}</b><br>🏠 {r['Batiment']}</div>", unsafe_allow_html=True)
 
 with t3:
@@ -174,10 +176,30 @@ with t3:
         df_final = df_mois[df_mois['Agent'].isin(agents_sel)]
 
         if not df_final.empty:
+            total_km = 0
+            groupes = 0
+            total_missions = len(df_final)
+            
+            for agent in agents_sel:
+                df_agt = df_final[df_final['Agent'] == agent].sort_values(['Date_Sort', 'Heure'])
+                for jour in df_agt['Date'].unique():
+                    missions_jour = df_agt[df_agt['Date'] == jour]
+                    prev_coords = BUREAU_GPS # Départ de Mont-Paisible 18
+                    for i, (idx, row) in enumerate(missions_jour.iterrows()):
+                        curr_b = row['Batiment']
+                        curr_coords = (INFOS_BATIMENTS[curr_b]['lat'], INFOS_BATIMENTS[curr_b]['lon']) if curr_b in INFOS_BATIMENTS else BUREAU_GPS
+                        total_km += calculer_distance(prev_coords, curr_coords)
+                        if i > 0 and curr_b == missions_jour.iloc[i-1]['Batiment']:
+                            groupes += 1
+                        prev_coords = curr_coords
+                    total_km += calculer_distance(prev_coords, BUREAU_GPS) # Retour à Mont-Paisible 18
+
+            tx_opti = (groupes / total_missions * 100) if total_missions > 0 else 0
+
             c1, c2, c3, c4 = st.columns(4)
-            c1.metric("Missions", len(df_final))
-            c2.metric("📈 Entrées", df_final[df_final['Type'].str.contains('Entrée|In', case=False)].shape[0])
-            c3.metric("📉 Sorties", df_final[df_final['Type'].str.contains('Sortie|Out', case=False)].shape[0])
+            c1.metric("Missions", total_missions)
+            c2.metric("📈 Taux Opti.", f"{tx_opti:.1f}%", help="Missions groupées dans le même bâtiment")
+            c3.metric("🚗 Est. Trajets", f"{total_km:.1f} km", help="Kilométrage total estimé (Aller/Retour Bureau inclus)")
             c4.metric("📅 Jours", df_final['Date'].nunique())
             
             st.divider()
@@ -185,11 +207,8 @@ with t3:
             df_chart = df_final.copy()
             df_chart['Semaine'] = df_chart['Date_Sort'].dt.isocalendar().week
             df_chart['Nom_Semaine'] = "Semaine " + df_chart['Semaine'].astype(str)
-            
             fig = px.histogram(df_chart.sort_values('Semaine'), x='Nom_Semaine', color='Agent', 
-                               title=f"Total missions : {len(df_final)}", color_discrete_map=COULEURS,
-                               barmode='group', text_auto=True)
-            fig.update_layout(xaxis_title="Semaine", yaxis_title="Nb Missions")
+                               color_discrete_map=COULEURS, barmode='group', text_auto=True)
             st.plotly_chart(fig, use_container_width=True)
 
             st.divider()
@@ -203,4 +222,4 @@ with t3:
                        for b, count in df_final.groupby('Batiment').size().items() if b in INFOS_BATIMENTS]))
 
 st.divider()
-st.caption(f"v3.3 | {datetime.now().year}")
+st.caption(f"v3.5 | {datetime.now().year}")
