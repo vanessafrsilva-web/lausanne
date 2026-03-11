@@ -299,20 +299,37 @@ with t3:
             st.divider()
             
             # --- NOUVEAU : GRAPHIQUE DE CHARGE HEBDOMADAIRE ---
-            st.subheader("📊 Charge de travail hebdomadaire (Nombre de missions)")
+  # --- CORRECTION : GRAPHIQUE DE CHARGE HEBDOMADAIRE ---
+            st.subheader("📊 Charge de travail hebdomadaire")
             
-            # Préparation des données pour le graphique
             df_chart = df_final.copy()
-            # ISO Week pour avoir le numéro de semaine correct
+            # On s'assure que la date est bien reconnue
+            df_chart['Date_Sort'] = pd.to_datetime(df_chart['Date_Sort'])
+            # On extrait le numéro de semaine
             df_chart['Semaine'] = df_chart['Date_Sort'].dt.isocalendar().week
             df_chart['Nom_Semaine'] = "Semaine " + df_chart['Semaine'].astype(str)
-            
-            # Groupement par semaine et par agent
-            grp_wk = df_chart.groupby(['Semaine', 'Nom_Semaine', 'Agent']).size().reset_index(name='Nb_Missions')
-            # Tri pour l'affichage X
-            grp_wk = grp_wk.sort_values('Semaine')
 
-            if not grp_wk.empty:
+            if not df_chart.empty:
+                # On crée le graphique directement à partir de df_chart
+                # Plotly va compter les lignes tout seul avec 'count'
+                fig = px.histogram(
+                    df_chart, 
+                    x='Nom_Semaine', 
+                    color='Agent',
+                    title=f"Nombre total de missions : {len(df_chart)}",
+                    color_discrete_map=COULEURS,
+                    barmode='group',
+                    text_auto=True # Cette option compte et affiche le total automatiquement
+                )
+                
+                fig.update_layout(
+                    xaxis_title="Semaine",
+                    yaxis_title="Nombre de Missions",
+                    legend_title="Agent",
+                    xaxis={'categoryorder':'category ascending'} # Garde les semaines dans l'ordre
+                )
+                
+                st.plotly_chart(fig, use_container_width=True)
                 # Création du graphique Plotly Express
 # Création du graphique Plotly Express corrigé
                 fig = px.bar(
