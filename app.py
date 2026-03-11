@@ -173,13 +173,14 @@ with t3:
         st.divider()
         col_left, col_right = st.columns([1, 1])
         
-        # Préparation des stats pour les deux colonnes
+        # Préparation des statistiques
         stats_bat = df_mois.groupby('Batiment').size().reset_index(name='Missions').sort_values('Missions', ascending=False)
 
         with col_left:
             st.subheader("🏠 Volume par bâtiment")
             st.table(stats_bat)
-with col_right:
+
+        with col_right:
             st.subheader("📍 Cartographie")
             map_data = []
             for _, row in stats_bat.iterrows():
@@ -192,25 +193,20 @@ with col_right:
                     })
             
             if map_data:
-                # 1. Création du DataFrame
                 df_map = pd.DataFrame(map_data)
-                
-                # 2. Calcul de la taille AVANT st.map pour éviter le calcul interne
-                # On convertit en float Python natif
+                # On calcule la taille ici en s'assurant du type float standard
                 df_map['taille_point'] = (df_map['Missions'] * 20).astype(float)
                 
-                # 3. Affichage avec la colonne de taille déjà calculée
                 st.map(
                     df_map, 
                     latitude='lat', 
                     longitude='lon', 
-                    size='taille_point',  # On passe le nom de la colonne
+                    size='taille_point', 
                     color="#FF4B4B"
                 )
             else:
-                st.info("Aucune donnée géographique disponible.")
-
-
-        st.info("Veuillez importer des données pour afficher les rapports.")
+                st.info("Aucune coordonnée disponible pour ces bâtiments.")
+    else:
+        st.info("Veuillez importer des données pour générer les rapports.")
 
 st.caption("v3.0 - Edition Cartographique")
