@@ -142,13 +142,27 @@ with st.sidebar:
 # --- ONGLETS ---
 with t1:
     if not st.session_state.db.empty:
-        df_v = st.session_state.db.sort_values(['Date_Sort', 'Heure'])
+        # --- FILTRES DE VUE ---
+        f_col1, f_col2 = st.columns([1, 3])
+        with f_col1:
+            agents_dispo = sorted(st.session_state.db['Agent'].unique())
+            filtre_agt = st.multiselect("🔍 Filtrer par agent :", agents_dispo, default=agents_dispo)
+        
+        # Application du filtre
+        df_v = st.session_state.db[st.session_state.db['Agent'].isin(filtre_agt)].sort_values(['Date_Sort', 'Heure'])
+        
         def style_row(s):
             if s['Heure'] == "⚠️ CONFLIT": return ['background-color: #ffcccc; color: #cc0000; font-weight: bold']*8
             color = COULEURS.get(s['Agent'], "#eeeeee")
             if str(s['Statut']).strip() != "": return [f'background-color: {color}; border: 2px solid #ff9933']*8
             return [f'background-color: {color}; color: black']*8
-        st.dataframe(df_v[['ID', 'Date', 'Statut', 'Heure', 'Agent', 'Batiment', 'Type', 'Rue']].style.apply(style_row, axis=1), use_container_width=True, height=500)
+            
+        st.dataframe(
+            df_v[['ID', 'Date', 'Statut', 'Heure', 'Agent', 'Batiment', 'Type', 'Rue']].style.apply(style_row, axis=1), 
+            use_container_width=True, 
+            height=600
+        )
+        st.info("💡 Astuce : Cliquez sur le nom d'une colonne pour trier (ex: cliquez sur 'Agent' pour grouper les missions par personne).")
 
 with t2:
     if not st.session_state.db.empty:
@@ -168,18 +182,15 @@ with t3:
     else:
         df_rep = st.session_state.db.copy()
         df_rep['Mois'] = df_rep['Date_Sort'].dt.strftime('%B %Y')
-        
         col_f1, col_f2 = st.columns(2)
         mois_sel = col_f1.selectbox("📅 Choisir le Mois :", df_rep['Mois'].unique())
         options_agents = [a for a in df_rep['Agent'].unique() if a != "⚠️ SANS AGENT"]
-        agents_sel = col_f2.multiselect("👤 Sélectionner Agents :", options_agents, default=options_agents)
-        
+        agents_sel = col_f2.multiselect("👤 Sélectionner Agents (Analyses) :", options_agents, default=options_agents)
         df_final = df_rep[(df_rep['Mois'] == mois_sel) & (df_rep['Agent'].isin(agents_sel))]
 
         if df_final.empty:
             st.warning("Aucune donnée pour cette sélection.")
         else:
-            # CALCULS
             total_km = 0.0
             groupes = 0
             for agent in agents_sel:
@@ -200,14 +211,12 @@ with t3:
             nb_entrees = df_final[df_final['Type'].str.contains('Entrée|In', case=False)].shape[0]
             nb_sorties = df_final[df_final['Type'].str.contains('Sortie|Out', case=False)].shape[0]
 
-            # AFFICHAGE METRICS (2 lignes de 4 colonnes pour la clarté)
             st.markdown("### 📊 Indicateurs Clés")
             row1 = st.columns(4)
             row1[0].metric("Total Missions", len(df_final))
-            row1[1].metric("📈 Taux Opti.", f"{tx_opti:.1f}%", help="Missions enchaînées sur un même lieu")
+            row1[1].metric("📈 Taux Opti.", f"{tx_opti:.1f}%")
             row1[2].metric("🚗 Distance Est.", f"{total_km:.1f} km")
             row1[3].metric("📅 Jours d'activité", df_final['Date'].nunique())
-            
             row2 = st.columns(4)
             row2[0].metric("📈 Nb Entrées", nb_entrees)
             row2[1].metric("📉 Nb Sorties", nb_sorties)
@@ -215,26 +224,12 @@ with t3:
             row2[3].metric("🏠 Bâtiments visités", df_final['Batiment'].nunique())
             
             st.divider()
-            
-            # Graphique
             df_chart = df_final.copy()
             df_chart['Semaine'] = df_chart['Date_Sort'].dt.isocalendar().week
             df_chart['Nom_Semaine'] = "Semaine " + df_chart['Semaine'].astype(str)
             fig = px.histogram(df_chart.sort_values('Semaine'), x='Nom_Semaine', color='Agent', 
-                               color_discrete_map=COULEURS, barmode='group', text_auto=True,
-                               title="Répartition des missions par semaine")
+                               color_discrete_map=COULEURS, barmode='group', text_auto=True)
             st.plotly_chart(fig, use_container_width=True)
 
-            cl, cr = st.columns(2)
-            with cl:
-                st.subheader("🏠 Volume par bâtiment")
-                st.table(df_final.groupby('Batiment').size().reset_index(name='Missions').sort_values('Missions', ascending=False))
-            with cr:
-                st.subheader("📍 Carte")
-                map_data = [{'lat': INFOS_BATIMENTS[b]['lat'], 'lon': INFOS_BATIMENTS[b]['lon'], 'Missions': count} 
-                            for b, count in df_final.groupby('Batiment').size().items() if b in INFOS_BATIMENTS]
-                if map_data:
-                    st.map(pd.DataFrame(map_data))
-
 st.divider()
-st.caption(f"v3.7 | {datetime.now().year}")
+st.caption(f"v3.8 | {datetime.now().year}")
