@@ -15,9 +15,9 @@ INFOS_BATIMENTS = {
 }
 COULEURS = {"Celine": "#d1e9ff", "Maria Claret": "#ffdae0", "Maria Elisabeth": "#d4f8d4", "À définir": "#eeeeee"}
 
-st.set_page_config(page_title="Unité Logement - Planning Expert v2", layout="wide")
+st.set_page_config(page_title="Unité Logement - Gestion Planning", layout="wide")
 
-# Initialisation des états
+# Initialisation
 if 'db' not in st.session_state:
     st.session_state.db = pd.DataFrame(columns=['Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Type', 'Date_Sort'])
 
@@ -49,16 +49,16 @@ def calculer_creneau_securise(agent, date_str, temp_db, batiment_cible):
         return "08:15", True
 
 # --- INTERFACE PRINCIPALE ---
-st.title("📍 Unité Logement : Planning & Optimisation")
+st.title("📍 Unité Logement : Planning & Rapports")
 
-t1, t2, t3, t4 = st.tabs(["📝 Planning Global", "📅 Vue par Agent", "📊 Performance", "💡 Optimisation"])
+t1, t2, t3 = st.tabs(["📝 Planning Global", "📅 Vue par Agent", "📊 Rapports Mensuels"])
 
 with st.sidebar:
     st.header("📂 Importation")
-    st.info("Les absences sont désormais gérées directement via la colonne 'Absent' de votre fichier Excel.")
+    st.info("Les absences sont gérées via la colonne 'Absent' de l'Excel (ex: Celine ; Maria Claret)")
     up = st.file_uploader("Fichier Excel des missions", type=['xlsx'])
     
-    if up and st.button("🚀 Lancer l'Attribution IA"):
+    if up and st.button("🚀 Lancer l'Attribution"):
         df_ex = pd.read_excel(up).dropna(how='all').fillna('')
         df_ex.columns = df_ex.columns.str.strip()
         
@@ -70,29 +70,21 @@ with st.sidebar:
         temp = pd.DataFrame(columns=['Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Type', 'Date_Sort'])
         
         for _, row in df_ex.sort_values(by=[c_date]).iterrows():
-            ds = pd.to_datetime(row[c_date]).strftime('%d/%m/%Y')
+            dt_raw = pd.to_datetime(row[c_date])
+            ds = dt_raw.strftime('%d/%m/%Y')
             rue_demandee = INFOS_BATIMENTS.get(row['Batiment'], "Autre")
             
-            # Gestion des absences via Excel uniquement
+            # Gestion robuste des absences
             absents_du_jour = []
             if c_absent and str(row[c_absent]).strip() != "":
-                absents_du_jour = [a.strip().lower() for a in str(row[c_absent]).split(';')]
+                absents_du_jour = [a.strip().lower().replace('-', ' ') for a in str(row[c_absent]).split(';')]
 
-            # Filtrage des agents
-            presents = [a for a in AGENTS if a.lower() not in absents_du_jour]
+            presents = [a for a in AGENTS if a.lower().replace('-', ' ') not in absents_du_jour]
             
             agt_elu, h_finale = "À définir", "08:15"
             
             if presents:
-                scores = {}
-                for p in presents:
-                    missions_agent = temp[(temp['Date'] == ds) & (temp['Agent'] == p)]
-                    if missions_agent.empty:
-                        scores[p] = 1 
-                    else:
-                        derniere_loc = missions_agent.iloc[-1]['Rue']
-                        scores[p] = 0 if derniere_loc == rue_demandee else 2
-                
+                scores = {p: (1 if temp[(temp['Date'] == ds) & (temp['Agent'] == p)].empty else (0 if temp[(temp['Date'] == ds) & (temp['Agent'] == p)].iloc[-1]['Rue'] == rue_demandee else 2)) for p in presents}
                 presents_tries = sorted(presents, key=lambda x: (scores[x], len(temp[(temp['Date'] == ds) & (temp['Agent'] == x)])))
                 
                 for p in presents_tries:
@@ -107,7 +99,7 @@ with st.sidebar:
             temp = pd.concat([temp, pd.DataFrame([{
                 'Batiment': row['Batiment'], 'Date': ds, 'Heure': h_finale, 'Agent': agt_elu, 
                 'Type': row[c_type], 'Rue': rue_demandee, 
-                'Date_Sort': pd.to_datetime(row[c_date])
+                'Date_Sort': dt_raw
             }])], ignore_index=True)
             
         st.session_state.db = temp
@@ -117,7 +109,7 @@ with st.sidebar:
         st.session_state.db = pd.DataFrame(columns=['Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Type', 'Date_Sort'])
         st.rerun()
 
-# --- LOGIQUE DES ONGLETS ---
+# --- ONGLETS ---
 
 with t1:
     if not st.session_state.db.empty:
@@ -130,7 +122,7 @@ with t1:
 
 with t2:
     if not st.session_state.db.empty:
-        sel_j = st.selectbox("Sélectionner une date :", sorted(st.session_state.db['Date'].unique()))
+        sel_j = st.selectbox("Sélectionner une date :", sorted(st.session_state.db['Date'].unique(), key=lambda x: datetime.strptime(x, '%d/%m/%Y')))
         cols = st.columns(len(AGENTS))
         for i, a in enumerate(AGENTS):
             with cols[i]:
@@ -142,65 +134,40 @@ with t2:
                         st.info(f"🕒 **{r['Heure']}**\n\n**{r['Batiment']}**\n\n*{r['Type']}*")
 
 with t3:
+    st.subheader("📊 Rapports d'activité")
     if not st.session_state.db.empty:
-        st.subheader("📊 Statistiques de l'équipe")
-        nb_total = len(st.session_state.db)
-        group_rue = st.session_state.db.groupby(['Date', 'Agent', 'Rue']).size()
-        missions_groupees = group_rue[group_rue > 1].sum()
-        taux_opti = (missions_groupees / nb_total * 100) if nb_total > 0 else 0
+        df_rep = st.session_state.db.copy()
+        df_rep['Mois'] = df_rep['Date_Sort'].dt.strftime('%B %Y')
+        
+        liste_mois = df_rep['Mois'].unique()
+        mois_sel = st.selectbox("Choisir le mois à analyser :", liste_mois)
+        
+        df_mois = df_rep[df_rep['Mois'] == mois_sel]
+        
+        # Calcul des Entrées / Sorties
+        # On considère 'Entrée' si le mot est dans le type, sinon 'Sortie' (ou à adapter selon tes libellés)
+        entrees = df_mois[df_mois['Type'].str.contains('Entrée|entree|In', case=False)].shape[0]
+        sorties = df_mois[df_mois['Type'].str.contains('Sortie|sortie|Out', case=False)].shape[0]
+        total = len(df_mois)
         
         c1, c2, c3 = st.columns(3)
-        c1.metric("Total Missions", nb_total)
-        c2.metric("Missions Groupées", int(missions_groupees))
-        c3.metric("Taux d'Optimisation", f"{int(taux_opti)}%")
-
-with t4:
-    st.subheader("💡 Suggestions d'Optimisation IA")
-    if st.session_state.db.empty:
-        st.info("Importez des données pour analyser les opportunités d'optimisation.")
-    else:
-        df_opti = st.session_state.db.copy()
-        suggestions = []
-
-        for date in df_opti['Date'].unique():
-            journee = df_opti[df_opti['Date'] == date]
-            for bat, rue in INFOS_BATIMENTS.items():
-                agents_sur_place = journee[journee['Rue'] == rue]['Agent'].unique()
-                agents_sur_place = [a for a in agents_sur_place if a != "À définir"]
-                if len(agents_sur_place) > 1:
-                    suggestions.append({
-                        "Type": "Double Déplacement",
-                        "Priorité": "Haute",
-                        "Détail": f"Le **{date}**, {', '.join(agents_sur_place)} se rendent tous à **{bat}**. Vous pourriez regrouper ces missions."
-                    })
-
-        charge = df_opti[df_opti['Agent'] != "À définir"]['Agent'].value_counts()
-        for a in AGENTS:
-            if a not in charge: charge[a] = 0
+        c1.metric("Total Missions", total)
+        c2.metric("📈 Entrées", entrees)
+        c3.metric("📉 Sorties", sorties)
         
-        if len(charge) > 0 and (charge.max() - charge.min() > 3):
-            suggestions.append({
-                "Type": "Déséquilibre de charge",
-                "Priorité": "Moyenne",
-                "Détail": f"**{charge.idxmax()}** a beaucoup plus de missions ({charge.max()}) que **{charge.idxmin()}** ({charge.min()})."
-            })
-
-        non_attribue = len(df_opti[df_opti['Agent'] == "À définir"])
-        if non_attribue > 0:
-            suggestions.append({
-                "Type": "Missions en attente",
-                "Priorité": "Critique",
-                "Détail": f"Il reste **{non_attribue}** missions sans agent (conflit d'horaire ou absence signalée dans l'Excel)."
-            })
-
-        if suggestions:
-            for s in suggestions:
-                if s['Priorité'] == "Haute" or s['Priorité'] == "Critique":
-                    st.error(f"**{s['Type']}** : {s['Détail']}")
-                else:
-                    st.warning(f"**{s['Type']}** : {s['Détail']}")
-        else:
-            st.success("✅ Félicitations ! Votre planning est parfaitement optimisé.")
+        st.divider()
+        
+        col_left, col_right = st.columns(2)
+        with col_left:
+            st.write("**Missions par Agent**")
+            st.bar_chart(df_mois['Agent'].value_counts())
+        
+        with col_right:
+            st.write("**Répartition par Bâtiment**")
+            st.table(df_mois['Batiment'].value_counts())
+            
+    else:
+        st.info("Veuillez importer des données pour voir les rapports.")
 
 st.divider()
-st.caption("Système de gestion de planning v2.0 - Unité Logement")
+st.caption("Système de gestion de planning v2.1 - Unité Logement")
