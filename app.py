@@ -173,31 +173,33 @@ with t3:
         st.divider()
         col_left, col_right = st.columns([1, 1])
         
+        # Préparation des stats pour les deux colonnes
+        stats_bat = df_mois.groupby('Batiment').size().reset_index(name='Missions').sort_values('Missions', ascending=False)
+
         with col_left:
             st.subheader("🏠 Volume par bâtiment")
-            stats_bat = df_mois.groupby('Batiment').size().reset_index(name='Missions').sort_values('Missions', ascending=False)
             st.table(stats_bat)
 
-  with col_right:
+        with col_right:
             st.subheader("📍 Cartographie")
             map_data = []
             for _, row in stats_bat.iterrows():
-                if row['Batiment'] in INFOS_BATIMENTS:
+                nom_bat = row['Batiment']
+                if nom_bat in INFOS_BATIMENTS:
                     map_data.append({
-                        'lat': INFOS_BATIMENTS[row['Batiment']]['lat'],
-                        'lon': INFOS_BATIMENTS[row['Batiment']]['lon'],
-                        # CONVERSION ICI : on force le type int natif ou float
-                        'Missions': int(row['Missions']) 
+                        'lat': INFOS_BATIMENTS[nom_bat]['lat'],
+                        'lon': INFOS_BATIMENTS[nom_bat]['lon'],
+                        'Missions': int(row['Missions']) # Conversion explicite en int Python
                     })
+            
             if map_data:
                 df_map = pd.DataFrame(map_data)
-                # On s'assure aussi que la colonne dans le DF est bien convertie
-                df_map['Missions'] = df_map['Missions'].astype(float) 
-                
+                # Conversion finale pour Streamlit Map
+                df_map['Missions'] = df_map['Missions'].astype(float)
                 st.map(df_map, latitude='lat', longitude='lon', size=df_map['Missions'] * 20, color="#FF4B4B")
             else:
-                st.info("Aucune donnée géographique à afficher.")
+                st.info("Aucune donnée géographique (coordonnées) disponible pour ce mois.")
     else:
-        st.info("Veuillez importer des données.")
+        st.info("Veuillez importer des données pour afficher les rapports.")
 
 st.caption("v3.0 - Edition Cartographique")
