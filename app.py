@@ -3,7 +3,6 @@ import pandas as pd
 from datetime import datetime, timedelta
 
 # --- CONFIGURATION FIXE ---
-# MISE À JOUR DE L'ADRESSE DU BUREAU
 BUREAU = "Chemin Mont-Paisible 18, 1011 Lausanne"
 AGENTS = ["Celine", "Maria Claret", "Maria Elisabeth"]
 INFOS_BATIMENTS = {
@@ -16,11 +15,9 @@ INFOS_BATIMENTS = {
 }
 COULEURS = {"Celine": "#d1e9ff", "Maria Claret": "#ffdae0", "Maria Elisabeth": "#d4f8d4", "À définir": "#eeeeee"}
 
-# URL du logo du CHUV
-LOGO_CHUV_URL = "https://www.chuv.ch/typo3conf/ext/chuv_site/Resources/Public/Images/logo-chuv-black.png"
-
 st.set_page_config(page_title="Unité Logement - Gestion Planning", layout="wide")
 
+# Initialisation
 if 'db' not in st.session_state:
     st.session_state.db = pd.DataFrame(columns=['Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Type', 'Statut', 'Date_Sort'])
 
@@ -60,15 +57,19 @@ def calculer_creneau_securise(agent, date_str, temp_db, batiment_cible, bloc_imp
         return "08:15", True
 
 # --- INTERFACE ---
-# En-tête avec logo et adresse
-col_logo, col_titre = st.columns([1, 4])
-with col_logo:
-    st.image(LOGO_CHUV_URL, width=150)
-with col_titre:
-    st.title("📍 Unité Logement : Planning & Rapports")
-    st.caption(f"📍 Siège social : {BUREAU}")
 
-st.markdown("---")
+# Bandeau d'en-tête CHUV
+st.markdown(f"""
+    <div style="background-color: #000000; padding: 20px; border-radius: 10px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;">
+        <div style="color: white; font-family: sans-serif;">
+            <h1 style="margin: 0; font-size: 28px; letter-spacing: 2px;">CHUV</h1>
+            <p style="margin: 0; font-size: 14px; color: #cccccc;">Unité Logement</p>
+        </div>
+        <div style="text-align: right; color: white; font-family: sans-serif;">
+            <p style="margin: 0; font-size: 12px;">📍 {BUREAU}</p>
+        </div>
+    </div>
+""", unsafe_allow_html=True)
 
 t1, t2, t3 = st.tabs(["📝 Planning Global", "📅 Vue par Agent", "📊 Rapports Mensuels"])
 
@@ -175,4 +176,4 @@ with t3:
         c2.metric("📈 Entrées", df_mois[df_mois['Type'].str.contains('Entrée|In', case=False)].shape[0])
         c3.metric("📉 Sorties", df_mois[df_mois['Type'].str.contains('Sortie|Out', case=False)].shape[0])
 
-st.caption("v2.7 - Démo Cheffe Unité Logement")
+st.caption("v2.8 - Présentation CHUV - Unité Logement")
