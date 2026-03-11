@@ -257,30 +257,24 @@ with t2:
                                 """, unsafe_allow_html=True)
     else:
         st.info("💡 Importez des données pour visualiser les plannings individuels.")
-
 # --- ONGLET 3 : Rapports & Graphiques ---
 with t3:
     if not st.session_state.db.empty:
         df_rep = st.session_state.db.copy()
-        # Création colonne Mois pour filtrage
         df_rep['Mois'] = df_rep['Date_Sort'].dt.strftime('%B %Y')
         
-        # --- FILTRES DE L'ONGLET ---
         st.subheader("🔍 Filtres d'analyse")
         c_f1, c_f2 = st.columns(2)
         with c_f1:
             mois_sel = st.selectbox("📅 Choisir le mois :", df_rep['Mois'].unique(), index=0)
         
-        # Filtrage par mois d'abord
         df_mois = df_rep[df_rep['Mois'] == mois_sel]
         
         with c_f2:
             agents_dispo = sorted(df_mois['Agent'].unique())
-            # Selection par défaut : tous sauf "Sans Agent"
             def_agents = [ag for ag in agents_dispo if ag != "⚠️ SANS AGENT"]
             agents_sel = st.multiselect("👤 Filtrer par Agent :", agents_dispo, default=def_agents)
 
-        # Application du filtre agent final
         df_final = df_mois[df_mois['Agent'].isin(agents_sel)]
         
         st.divider()
@@ -291,12 +285,79 @@ with t3:
             c1.metric("Total Missions", len(df_final))
             c2.metric("📈 Entrées/In", df_final[df_final['Type'].str.contains('Entrée|In', case=False)].shape[0])
             c3.metric("📉 Sorties/Out", df_final[df_final['Type'].str.contains('Sortie|Out', case=False)].shape[0])
-            
-            # Calcul jours travaillés (distincts)
             jours_trav = df_final['Date'].nunique()
             c4.metric("📅 Jours d'activité", jours_trav)
             
             st.divider()
+            
+            # --- GRAPHIQUE DE CHARGE HEBDOMADAIRE CORRIGÉ ---
+            st.subheader("📊 Charge de travail hebdomadaire")
+            
+            df_chart = df_final.copy()
+            df_chart['Date_Sort'] = pd.to_datetime(df_chart['Date_Sort'])
+            df_chart['Semaine'] = df_chart['Date_Sort'].dt.isocalendar().week
+            df_chart['Nom_Semaine'] = "Semaine " + df_chart['Semaine'].astype(str)
+
+            # Tri par numéro de semaine pour l'affichage
+            df_chart = df_chart.sort_values('Semaine')
+
+            # Utilisation de l'histogramme pour compter automatiquement chaque ligne comme 1 mission
+            fig = px.histogram(
+                df_chart, 
+                x='Nom_Semaine', 
+                color='Agent',
+                title=f"Nombre total de missions détectées : {len(df_chart)}",
+                color_discrete_map=COULEURS,
+                barmode='group',
+                text_auto=True
+            )
+            
+            fig.update_layout(
+                xaxis_title="Semaine",
+                yaxis_title="Nombre de Missions",
+                legend_title="Agent",
+                yaxis=dict(tickformat="d") # Force l'affichage de nombres entiers
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
+
+            st.divider()
+            
+            # --- SECTION BASSE : TABLEAU & CARTE ---
+            col_left, col_right = st.columns([1, 1])
+            
+            stats_bat = df_final.groupby('Batiment').size().reset_index(name='Missions').sort_values('Missions', ascending=False)
+
+            with col_left:
+                st.subheader("🏠 Volume par bâtiment")
+                if not stats_bat.empty:
+                    st.dataframe(stats_bat, use_container_width=True, hide_index=True)
+                else:
+                    st.write("Aucune donnée.")
+
+            with col_right:
+                st.subheader("📍 Cartographie")
+                map_data = []
+                for _, row in stats_bat.iterrows():
+                    nom_bat = row['Batiment']
+                    if nom_bat in INFOS_BATIMENTS:
+                        map_data.append({
+                            'lat': float(INFOS_BATIMENTS[nom_bat]['lat']),
+                            'lon': float(INFOS_BATIMENTS[nom_bat]['lon']),
+                            'Missions': int(row['Missions']),
+                            'Nom': nom_bat
+                        })
+                
+                if map_data:
+                    df_map = pd.DataFrame(map_data)
+                    df_map['taille_point'] = (df_map['Missions'] * 15).astype(float)
+                    st.map(df_map, latitude='lat', longitude='lon', size='taille_point', color="#FF4B4B")
+                else:
+                    st.info("Pas de coordonnées GPS dispo.")
+        else:
+             st.warning("Aucune donnée pour cette sélection.")
+    else:
+        st.info("💡 Importez des données pour générer les rapports.")
             
             # --- NOUVEAU : GRAPHIQUE DE CHARGE HEBDOMADAIRE ---
   # --- CORRECTION : GRAPHIQUE DE CHARGE HEBDOMADAIRE ---
