@@ -30,7 +30,7 @@ def calculer_distance(pos1, pos2):
     lat1, lon1 = np.radians(pos1[0]), np.radians(pos1[1])
     lat2, lon2 = np.radians(pos2[0]), np.radians(pos2[1])
     dlon = lon2 - lon1
-    dlat = lat2 - lat1
+    dlat = dlat = lat2 - lat1
     a = np.sin(dlat / 2)**2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon / 2)**2
     c = 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
     return R * c
@@ -140,13 +140,11 @@ with st.sidebar:
             st.rerun()
 
 # --- ONGLETS ---
-# --- Dans l'onglet t1 (Planning Global) ---
 with t1:
     if not st.session_state.db.empty:
-        # --- FILTRE ÉLÉGANT ET COMPACT ---
-        agents_dispo = sorted(st.session_state.db['Agent'].unique())
+        # --- FILTRE ÉLÉGANT ---
+        agents_dispo = sorted([a for a in st.session_state.db['Agent'].unique() if a != "⚠️ SANS AGENT"])
         
-        # Utilisation de st.pills pour un look rectangulaire et discret
         filtre_agt = st.pills(
             "Filtrer par agent :", 
             agents_dispo, 
@@ -154,13 +152,12 @@ with t1:
             default=agents_dispo
         )
         
-        # Sécurité : si rien n'est sélectionné, on montre tout ou on avertit
-        if not filtre_agt:
-            st.info("Sélectionnez au moins un agent pour afficher le planning.")
-            df_v = pd.DataFrame()
-        else:
-            # Application du filtre
-            df_v = st.session_state.db[st.session_state.db['Agent'].isin(filtre_agt)].sort_values(['Date_Sort', 'Heure'])
+        # On inclut toujours "SANS AGENT" dans le calcul si présent, mais on filtre sur les autres
+        selection = list(filtre_agt) if filtre_agt else []
+        if "⚠️ SANS AGENT" in st.session_state.db['Agent'].values:
+            selection.append("⚠️ SANS AGENT")
+
+        df_v = st.session_state.db[st.session_state.db['Agent'].isin(selection)].sort_values(['Date_Sort', 'Heure'])
         
         if not df_v.empty:
             def style_row(s):
@@ -174,6 +171,8 @@ with t1:
                 use_container_width=True, 
                 height=600
             )
+        else:
+            st.info("Sélectionnez un agent pour voir son planning.")
 
 with t2:
     if not st.session_state.db.empty:
@@ -243,4 +242,4 @@ with t3:
             st.plotly_chart(fig, use_container_width=True)
 
 st.divider()
-st.caption(f"v3.8 | {datetime.now().year}")
+st.caption(f"v3.9 | {datetime.now().year}")
