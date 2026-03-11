@@ -3,7 +3,8 @@ import pandas as pd
 from datetime import datetime, timedelta
 
 # --- CONFIGURATION FIXE ---
-BUREAU = "18 Mon Repos, 1005 Lausanne"
+# MISE À JOUR DE L'ADRESSE DU BUREAU
+BUREAU = "Chemin Mont-Paisible 18, 1011 Lausanne"
 AGENTS = ["Celine", "Maria Claret", "Maria Elisabeth"]
 INFOS_BATIMENTS = {
     'Bethusy A': 'Avenue de Béthusy 54, Lausanne',
@@ -15,6 +16,9 @@ INFOS_BATIMENTS = {
 }
 COULEURS = {"Celine": "#d1e9ff", "Maria Claret": "#ffdae0", "Maria Elisabeth": "#d4f8d4", "À définir": "#eeeeee"}
 
+# URL du logo du CHUV
+LOGO_CHUV_URL = "https://www.chuv.ch/typo3conf/ext/chuv_site/Resources/Public/Images/logo-chuv-black.png"
+
 st.set_page_config(page_title="Unité Logement - Gestion Planning", layout="wide")
 
 if 'db' not in st.session_state:
@@ -25,9 +29,8 @@ if 'db' not in st.session_state:
 def calculer_creneau_securise(agent, date_str, temp_db, batiment_cible, bloc_impose=None, heure_forcee=None):
     m_jour = temp_db[(temp_db['Date'] == date_str) & (temp_db['Agent'] == agent)]
     
-    # Si heure forcée (Mode Fixe), on vérifie si l'agent est déjà pris
     if heure_forcee:
-        if not m_jour.empty and heure_forcee in m_jour['Heure'].values:
+        if not m_jour.empty and heure_forcee in [str(h) for h in m_jour['Heure'].values]:
             return "⚠️ CONFLIT", False
         return heure_forcee, True
 
@@ -57,7 +60,15 @@ def calculer_creneau_securise(agent, date_str, temp_db, batiment_cible, bloc_imp
         return "08:15", True
 
 # --- INTERFACE ---
-st.title("📍 Unité Logement : Planning & Rapports")
+# En-tête avec logo et adresse
+col_logo, col_titre = st.columns([1, 4])
+with col_logo:
+    st.image(LOGO_CHUV_URL, width=150)
+with col_titre:
+    st.title("📍 Unité Logement : Planning & Rapports")
+    st.caption(f"📍 Siège social : {BUREAU}")
+
+st.markdown("---")
 
 t1, t2, t3 = st.tabs(["📝 Planning Global", "📅 Vue par Agent", "📊 Rapports Mensuels"])
 
@@ -87,17 +98,14 @@ with st.sidebar:
             statut_val = str(row[c_statut]).strip()
             h_excel = str(row[c_heure]).strip()[:5] if str(row[c_heure]).strip() not in ["", "nan", "libre"] else None
 
-            # Bloc horaire
             bloc = "Matin" if "matin" in statut_val.lower() else ("Après-midi" if "midi" in statut_val.lower() else None)
-
-            # Absences
             absents = [a.strip().lower().replace('-', ' ') for a in str(row[c_absent]).split(';')] if c_absent and str(row[c_absent]).strip() != "" else []
             presents = [a for a in AGENTS if a.lower().replace('-', ' ') not in absents]
             
-            agt_elu, h_finale = "À définir", (h_excel if h_excel else "08:15")
+            agt_elu = "⚠️ SANS AGENT"
+            h_finale = h_excel if h_excel else "08:15"
             
             if presents:
-                # Tri des agents par charge et proximité
                 scores = {p: (1 if temp[(temp['Date'] == ds) & (temp['Agent'] == p)].empty else (0 if temp[(temp['Date'] == ds) & (temp['Agent'] == p)].iloc[-1]['Rue'] == rue_demandee else 2)) for p in presents}
                 presents_tries = sorted(presents, key=lambda x: (scores[x], len(temp[(temp['Date'] == ds) & (temp['Agent'] == x)])))
                 
@@ -108,7 +116,8 @@ with st.sidebar:
                         agt_elu, h_finale = p, res_h
                         break
                     elif res_h == "⚠️ CONFLIT":
-                        h_finale = "⚠️ CONFLIT" # Marque le conflit si aucun agent n'est libre à cette heure
+                        h_finale = "⚠️ CONFLIT"
+                        agt_elu = p
             
             temp = pd.concat([temp, pd.DataFrame([{
                 'Batiment': row['Batiment'], 'Date': ds, 'Heure': h_finale, 'Agent': agt_elu, 
@@ -118,8 +127,6 @@ with st.sidebar:
         st.session_state.db = temp
         st.rerun()
 
-    st.divider()
-    filtre_souhaits = st.toggle("Voir uniquement les demandes locataires")
     if st.button("🗑️ Reset Complet"):
         st.session_state.db = pd.DataFrame(columns=['Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Type', 'Statut', 'Date_Sort'])
         st.rerun()
@@ -128,11 +135,10 @@ with st.sidebar:
 with t1:
     if not st.session_state.db.empty:
         df_v = st.session_state.db.sort_values(['Date_Sort', 'Heure'])
-        if filtre_souhaits: df_v = df_v[df_v['Statut'] != ""]
-        
         def style_row(s):
-            color = COULEURS.get(s['Agent'], "#eeeeee")
             if s['Heure'] == "⚠️ CONFLIT": return ['background-color: #ffcccc; color: red; font-weight: bold']*7
+            if s['Agent'] == "⚠️ SANS AGENT": return ['background-color: #333333; color: white; font-weight: bold']*7
+            color = COULEURS.get(s['Agent'], "#eeeeee")
             if s['Statut'] != "": return [f'background-color: {color}; border: 2px solid orange']*7
             return [f'background-color: {color}']*7
 
@@ -147,11 +153,15 @@ with t2:
                 st.markdown(f"<div style='text-align:center; background-color:{COULEURS[a]}; padding:10px; border-radius:5px; color:black; font-weight:bold;'>{a}</div>", unsafe_allow_html=True)
                 m = st.session_state.db[(st.session_state.db['Date'] == sel_j) & (st.session_state.db['Agent'] == a)].sort_values('Heure')
                 for _, r in m.iterrows():
-                    if r['Heure'] == "⚠️ CONFLIT":
-                        st.error(f"❌ **CONFLIT HORAIRE**\n\n**{r['Batiment']}**")
+                    if r['Heure'] == "⚠️ CONFLIT": st.error(f"❌ **CONFLIT**\n\n{r['Heure']} - {r['Batiment']}")
                     else:
                         box = st.warning if r['Statut'] != "" else st.info
-                        box(f"🕒 **{r['Heure']}**\n\n**{r['Batiment']}**\n\n*{r['Type']}*")
+                        box(f"🕒 **{r['Heure']}**\n\n**{r['Batiment']}**")
+        
+        non_attrib = st.session_state.db[(st.session_state.db['Date'] == sel_j) & (st.session_state.db['Agent'] == "⚠️ SANS AGENT")]
+        if not non_attrib.empty:
+            st.error("⚠️ **MISSIONS NON ATTRIBUÉES :**")
+            for _, r in non_attrib.iterrows(): st.write(f"❌ {r['Batiment']} ({r['Type']})")
 
 with t3:
     st.markdown("<style>[data-testid='stMetricValue'], [data-testid='stMetricLabel'], .stMarkdown p, h3 {color: black !important;} table td, table th {color: black !important; font-weight: 500 !important;} .stTable {color: black !important;}</style>", unsafe_allow_html=True)
@@ -164,6 +174,5 @@ with t3:
         c1.metric("Total Missions", len(df_mois))
         c2.metric("📈 Entrées", df_mois[df_mois['Type'].str.contains('Entrée|In', case=False)].shape[0])
         c3.metric("📉 Sorties", df_mois[df_mois['Type'].str.contains('Sortie|Out', case=False)].shape[0])
-        st.bar_chart(df_mois['Agent'].value_counts())
 
-st.caption("v2.5 - Démo Cheffe (Gestion des conflits incluse)")
+st.caption("v2.7 - Démo Cheffe Unité Logement")
