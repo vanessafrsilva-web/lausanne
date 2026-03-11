@@ -162,23 +162,40 @@ with t3:
     if not st.session_state.db.empty:
         df_rep = st.session_state.db.copy()
         df_rep['Mois'] = df_rep['Date_Sort'].dt.strftime('%B %Y')
-        mois_sel = st.selectbox("Choisir le mois :", df_rep['Mois'].unique())
+        
+        # --- FILTRES ---
+        c_f1, c_f2 = st.columns(2)
+        with c_f1:
+            mois_sel = st.selectbox("📅 Choisir le mois :", df_rep['Mois'].unique())
+        
+        # Filtrage par mois d'abord
         df_mois = df_rep[df_rep['Mois'] == mois_sel]
         
+        with c_f2:
+            agents_dispo = sorted(df_mois['Agent'].unique())
+            agents_sel = st.multiselect("👤 Filtrer par Agent :", agents_dispo, default=agents_dispo)
+
+        # Application du filtre agent
+        df_final = df_mois[df_mois['Agent'].isin(agents_sel)]
+        
+        # --- MÉTRIQUES ---
         c1, c2, c3 = st.columns(3)
-        c1.metric("Total Missions", len(df_mois))
-        c2.metric("📈 Entrées", df_mois[df_mois['Type'].str.contains('Entrée|In', case=False)].shape[0])
-        c3.metric("📉 Sorties", df_mois[df_mois['Type'].str.contains('Sortie|Out', case=False)].shape[0])
+        c1.metric("Total Missions", len(df_final))
+        c2.metric("📈 Entrées", df_final[df_final['Type'].str.contains('Entrée|In', case=False)].shape[0])
+        c3.metric("📉 Sorties", df_final[df_final['Type'].str.contains('Sortie|Out', case=False)].shape[0])
         
         st.divider()
         col_left, col_right = st.columns([1, 1])
         
-        # Préparation des statistiques
-        stats_bat = df_mois.groupby('Batiment').size().reset_index(name='Missions').sort_values('Missions', ascending=False)
+        # Préparation des statistiques (basée sur le filtre final)
+        stats_bat = df_final.groupby('Batiment').size().reset_index(name='Missions').sort_values('Missions', ascending=False)
 
         with col_left:
             st.subheader("🏠 Volume par bâtiment")
-            st.table(stats_bat)
+            if not stats_bat.empty:
+                st.table(stats_bat)
+            else:
+                st.write("Aucune donnée pour cette sélection.")
 
         with col_right:
             st.subheader("📍 Cartographie")
@@ -189,12 +206,12 @@ with t3:
                     map_data.append({
                         'lat': float(INFOS_BATIMENTS[nom_bat]['lat']),
                         'lon': float(INFOS_BATIMENTS[nom_bat]['lon']),
-                        'Missions': int(row['Missions'])
+                        'Missions': int(row['Missions']),
+                        'Nom': nom_bat
                     })
             
             if map_data:
                 df_map = pd.DataFrame(map_data)
-                # On calcule la taille ici en s'assurant du type float standard
                 df_map['taille_point'] = (df_map['Missions'] * 20).astype(float)
                 
                 st.map(
@@ -205,7 +222,7 @@ with t3:
                     color="#FF4B4B"
                 )
             else:
-                st.info("Aucune coordonnée disponible pour ces bâtiments.")
+                st.info("Aucune donnée géographique pour la sélection actuelle.")
     else:
         st.info("Veuillez importer des données pour générer les rapports.")
 
