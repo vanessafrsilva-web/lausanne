@@ -190,6 +190,7 @@ with t2:
                     color = "#ffcccc" if r['Heure'] == "⚠️ CONFLIT" else COULEURS[a]
                     st.markdown(f"<div style='background-color:{color}; padding:8px; border-radius:5px; border:1px solid #ccc; color:black; margin-top:5px;'>🆔 <b>{r['ID']}</b><br>🕒 <b>{r['Heure']}</b><br>🏠 {r['Batiment']}</div>", unsafe_allow_html=True)
 
+# --- Remplacement du bloc t3 complet pour récupérer la carte ---
 with t3:
     if st.session_state.db.empty:
         st.info("Importez un fichier Excel pour voir les analyses.")
@@ -238,12 +239,40 @@ with t3:
             row2[3].metric("🏠 Bâtiments visités", df_final['Batiment'].nunique())
             
             st.divider()
+            
+            # Graphique hebdomadaire
             df_chart = df_final.copy()
             df_chart['Semaine'] = df_chart['Date_Sort'].dt.isocalendar().week
             df_chart['Nom_Semaine'] = "Semaine " + df_chart['Semaine'].astype(str)
             fig = px.histogram(df_chart.sort_values('Semaine'), x='Nom_Semaine', color='Agent', 
-                               color_discrete_map=COULEURS, barmode='group', text_auto=True)
+                               color_discrete_map=COULEURS, barmode='group', text_auto=True,
+                               title="Volume de missions par semaine")
             st.plotly_chart(fig, use_container_width=True)
+
+            # --- RÉCUPÉRATION DE LA CARTOGRAPHIE ET DU TABLEAU ---
+            st.divider()
+            cl, cr = st.columns(2)
+            with cl:
+                st.subheader("🏠 Volume par bâtiment")
+                df_bat = df_final.groupby('Batiment').size().reset_index(name='Missions').sort_values('Missions', ascending=False)
+                st.table(df_bat)
+            
+            with cr:
+                st.subheader("📍 Carte des interventions")
+                # Préparation des données pour la carte
+                map_data = []
+                for b, count in df_final.groupby('Batiment').size().items():
+                    if b in INFOS_BATIMENTS:
+                        map_data.append({
+                            'lat': INFOS_BATIMENTS[b]['lat'], 
+                            'lon': INFOS_BATIMENTS[b]['lon'], 
+                            'Missions': count
+                        })
+                
+                if map_data:
+                    st.map(pd.DataFrame(map_data), size="Missions")
+                else:
+                    st.info("Aucune coordonnée GPS disponible pour ces bâtiments.")
 
 st.divider()
 st.caption(f"v3.9 | {datetime.now().year}")
