@@ -3,11 +3,11 @@ import pandas as pd
 from datetime import datetime, timedelta
 import io
 
-# --- CONFIGURATION ---
+# --- CONFIGURATION FIXE ---
 BUREAU = "Chemin Mont-Paisible 18, 1011 Lausanne"
 AGENTS = ["Celine", "Maria Claret", "Maria Elisabeth"]
 
-# Ajout des coordonnées pour la cartographie
+# Coordonnées GPS pour la cartographie à Lausanne
 INFOS_BATIMENTS = {
     'Bethusy A': {'rue': 'Avenue de Béthusy 54, Lausanne', 'lat': 46.5225, 'lon': 6.6472},
     'Bethusy B': {'rue': 'Avenue de Béthusy 56, Lausanne', 'lat': 46.5227, 'lon': 6.6475},
@@ -17,7 +17,9 @@ INFOS_BATIMENTS = {
     'Oron': {'rue': "Route d'Oron 77, 1010 Lausanne", 'lat': 46.5361, 'lon': 6.6625}
 }
 
-COULEURS = {"Celine": "#d1e9ff", "Maria Claret": "#ffdae0", "Maria Elisabeth": "#d4f8d4", "À définir": "#eeeeee"}
+# Couleurs HEX pour le planning et la carte
+# Celine: Bleu | Maria Claret: Rose | Maria Elisabeth: Vert
+COULEURS = {"Celine": "#007bff", "Maria Claret": "#ff33a1", "Maria Elisabeth": "#28a745", "À définir": "#eeeeee"}
 
 st.set_page_config(page_title="Unité Logement - Gestion Planning", layout="wide")
 
@@ -44,9 +46,11 @@ def calculer_creneau_securise(agent, date_str, temp_db, batiment_cible, bloc_imp
         rue_cible = INFOS_BATIMENTS.get(batiment_cible, {}).get('rue', "Autre")
         derniere_rue = m_jour.iloc[-1]['Rue'] if not m_jour.empty else "Bureau"
         
+        # Logique de temps de trajet : 65 min si même rue, 80 min si déplacement
         delai = 65 if derniere_rue == rue_cible else 80 
         prochaine_h = h_obj + timedelta(minutes=delai) if not m_jour.empty else h_obj
         
+        # Pause déjeuner
         if datetime.strptime("12:00", "%H:%M") <= prochaine_h < datetime.strptime("13:00", "%H:%M"):
             prochaine_h = datetime.strptime("13:00", "%H:%M")
         
@@ -121,6 +125,7 @@ with st.sidebar:
         st.session_state.db = temp
         st.rerun()
 
+    st.subheader("💾 Exportation")
     if not st.session_state.db.empty:
         output = io.BytesIO()
         df_export = st.session_state.db.sort_values(['Date_Sort', 'Heure']).drop(columns=['Date_Sort'])
@@ -140,11 +145,12 @@ with t1:
         def style_row(s):
             if s['Heure'] == "⚠️ CONFLIT": return ['background-color: #ffcccc; color: red; font-weight: bold']*7
             if s['Agent'] == "⚠️ SANS AGENT": return ['background-color: #333333; color: white; font-weight: bold']*7
+            # On utilise une version plus claire de la couleur pour le tableau
             color = COULEURS.get(s['Agent'], "#eeeeee")
-            if s['Statut'] != "": return [f'background-color: {color}; border: 2px solid orange']*7
-            return [f'background-color: {color}']*7
+            if s['Statut'] != "": return [f'background-color: {color}; border: 2px solid orange; color: white']*7
+            return [f'background-color: {color}; color: white']*7
 
-        st.dataframe(df_v[['Date', 'Statut', 'Heure', 'Agent', 'Batiment', 'Type', 'Rue']].style.apply(style_row, axis=1), use_container_width=True, height=400)
+        st.dataframe(df_v[['Date', 'Statut', 'Heure', 'Agent', 'Batiment', 'Type', 'Rue']].style.apply(style_row, axis=1), use_container_width=True, height=500)
 
 with t2:
     if not st.session_state.db.empty:
@@ -152,17 +158,21 @@ with t2:
         cols = st.columns(len(AGENTS))
         for i, a in enumerate(AGENTS):
             with cols[i]:
-                st.markdown(f"<div style='text-align:center; background-color:{COULEURS[a]}; padding:10px; border-radius:5px; color:black; font-weight:bold;'>{a}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div style='text-align:center; background-color:{COULEURS[a]}; padding:10px; border-radius:5px; color:white; font-weight:bold;'>{a}</div>", unsafe_allow_html=True)
                 m = st.session_state.db[(st.session_state.db['Date'] == sel_j) & (st.session_state.db['Agent'] == a)].sort_values('Heure')
                 for _, r in m.iterrows():
                     box = st.error if r['Heure'] == "⚠️ CONFLIT" else (st.warning if r['Statut'] != "" else st.info)
-                    box(f"🕒 **{r['Heure']}**\n\n**{r['Batiment']}**")
+                    box(f"🕒 **{r['Heure']}**\n\n**{r['Batiment']}**\n\n_{r['Type']}_")
 
 with t3:
     if not st.session_state.db.empty:
         df_rep = st.session_state.db.copy()
         df_rep['Mois'] = df_rep['Date_Sort'].dt.strftime('%B %Y')
-        mois_sel = st.selectbox("Choisir le mois :", df_rep['Mois'].unique())
+        
+        col_h1, col_h2 = st.columns(2)
+        mois_sel = col_h1.selectbox("Choisir le mois :", df_rep['Mois'].unique())
+        agent_sel = col_h2.selectbox("Filtrer la carte par agent :", ["Toute l'équipe"] + AGENTS)
+        
         df_mois = df_rep[df_rep['Mois'] == mois_sel]
         
         c1, c2, c3 = st.columns(3)
@@ -171,7 +181,7 @@ with t3:
         c3.metric("📉 Sorties", df_mois[df_mois['Type'].str.contains('Sortie|Out', case=False)].shape[0])
         
         st.divider()
-        col_left, col_right = st.columns([1, 1])
+        col_left, col_right = st.columns([1, 1.5])
         
         with col_left:
             st.subheader("🏠 Volume par bâtiment")
@@ -179,22 +189,34 @@ with t3:
             st.table(stats_bat)
 
         with col_right:
-            st.subheader("📍 Cartographie")
+            st.subheader(f"📍 Cartographie : {agent_sel}")
+            
+            # Filtrage pour la carte
+            df_map_filtered = df_mois.copy()
+            if agent_sel != "Toute l'équipe":
+                df_map_filtered = df_map_filtered[df_map_filtered['Agent'] == agent_sel]
+            
             map_data = []
-            for _, row in stats_bat.iterrows():
-                if row['Batiment'] in INFOS_BATIMENTS:
+            for bat in df_map_filtered['Batiment'].unique():
+                if bat in INFOS_BATIMENTS:
+                    count = len(df_map_filtered[df_map_filtered['Batiment'] == bat])
+                    agt = df_map_filtered[df_map_filtered['Batiment'] == bat]['Agent'].iloc[0]
                     map_data.append({
-                        'lat': INFOS_BATIMENTS[row['Batiment']]['lat'],
-                        'lon': INFOS_BATIMENTS[row['Batiment']]['lon'],
-                        'Missions': row['Missions']
+                        'lat': INFOS_BATIMENTS[bat]['lat'],
+                        'lon': INFOS_BATIMENTS[bat]['lon'],
+                        'Missions': count,
+                        'Agent': agt,
+                        'Couleur': COULEURS.get(agt, "#808080")
                     })
+            
             if map_data:
                 df_map = pd.DataFrame(map_data)
-                # Taille des points basée sur le nombre de missions
-                st.map(df_map, latitude='lat', longitude='lon', size=df_map['Missions'] * 20, color="#FF4B4B")
+                # Affichage de la carte
+                st.map(df_map, latitude='lat', longitude='lon', size=df_map['Missions'] * 30, color='Couleur')
+                st.caption("🔵 Celine | 🔴 Maria Claret | 🟢 Maria Elisabeth")
             else:
-                st.info("Aucune donnée géographique à afficher.")
+                st.info("Aucun bâtiment avec coordonnées trouvé pour ce filtre.")
     else:
         st.info("Veuillez importer des données.")
 
-st.caption("v3.0 - Edition Cartographique")
+st.caption("v3.1 - Dashboard Logement Lausanne")
