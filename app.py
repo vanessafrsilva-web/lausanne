@@ -15,7 +15,7 @@ INFOS_BATIMENTS = {
 }
 COULEURS = {"Celine": "#d1e9ff", "Maria Claret": "#ffdae0", "Maria Elisabeth": "#d4f8d4", "À définir": "#eeeeee"}
 
-st.set_page_config(page_title="Unité Logement - Gestion Planning", layout="wide")
+st.set_page_config(page_title="CHUV - Unité Logement", layout="wide")
 
 # Initialisation
 if 'db' not in st.session_state:
@@ -25,51 +25,43 @@ if 'db' not in st.session_state:
 
 def calculer_creneau_securise(agent, date_str, temp_db, batiment_cible, bloc_impose=None, heure_forcee=None):
     m_jour = temp_db[(temp_db['Date'] == date_str) & (temp_db['Agent'] == agent)]
-    
     if heure_forcee:
         if not m_jour.empty and heure_forcee in [str(h) for h in m_jour['Heure'].values]:
             return "⚠️ CONFLIT", False
         return heure_forcee, True
-
     if m_jour.empty:
         h_depart_str = "08:15" if bloc_impose != "Après-midi" else "13:00"
     else:
         h_depart_str = str(m_jour.iloc[-1]['Heure']).strip()
-
     try:
         h_obj = datetime.strptime(h_depart_str, "%H:%M")
         rue_cible = INFOS_BATIMENTS.get(batiment_cible, "Autre")
         derniere_rue = m_jour.iloc[-1]['Rue'] if not m_jour.empty else "Bureau"
-        
         delai = 65 if derniere_rue == rue_cible else 80 
         prochaine_h = h_obj + timedelta(minutes=delai) if not m_jour.empty else h_obj
-        
         if datetime.strptime("12:00", "%H:%M") <= prochaine_h < datetime.strptime("13:00", "%H:%M"):
             prochaine_h = datetime.strptime("13:00", "%H:%M")
-        
         if bloc_impose == "Matin" and prochaine_h > datetime.strptime("11:45", "%H:%M"):
             return "COMPLET MATIN", False
         if prochaine_h > datetime.strptime("16:30", "%H:%M"):
             return "COMPLET JOUR", False
-            
         return prochaine_h.strftime("%H:%M"), True
     except:
         return "08:15", True
 
-# --- INTERFACE ---
+# --- INTERFACE (Titre et Logo) ---
 
-# Bandeau d'en-tête CHUV
-st.markdown(f"""
-    <div style="background-color: #000000; padding: 20px; border-radius: 10px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;">
-        <div style="color: white; font-family: sans-serif;">
-            <h1 style="margin: 0; font-size: 28px; letter-spacing: 2px;">CHUV</h1>
-            <p style="margin: 0; font-size: 14px; color: #cccccc;">Unité Logement</p>
-        </div>
-        <div style="text-align: right; color: white; font-family: sans-serif;">
-            <p style="margin: 0; font-size: 12px;">📍 {BUREAU}</p>
-        </div>
-    </div>
-""", unsafe_allow_html=True)
+col1, col2 = st.columns([1, 3])
+with col1:
+    # Logo de secours via une URL plus stable
+    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/f/f6/CHUV_logo.svg/1200px-CHUV_logo.svg.png", width=180)
+
+with col2:
+    st.title("UNITE LOGEMENT")
+    st.subheader("Gestion du Planning & Optimisation")
+    st.write(f"📍 **Adresse :** {BUREAU}")
+
+st.divider()
 
 t1, t2, t3 = st.tabs(["📝 Planning Global", "📅 Vue par Agent", "📊 Rapports Mensuels"])
 
@@ -142,38 +134,35 @@ with t1:
             color = COULEURS.get(s['Agent'], "#eeeeee")
             if s['Statut'] != "": return [f'background-color: {color}; border: 2px solid orange']*7
             return [f'background-color: {color}']*7
-
         st.dataframe(df_v[['Date', 'Statut', 'Heure', 'Agent', 'Batiment', 'Type', 'Rue']].style.apply(style_row, axis=1), use_container_width=True, height=500)
 
 with t2:
     if not st.session_state.db.empty:
-        sel_j = st.selectbox("Sélectionner une date :", sorted(st.session_state.db['Date'].unique(), key=lambda x: datetime.strptime(x, '%d/%m/%Y')))
+        sel_j = st.selectbox("Choisir une date :", sorted(st.session_state.db['Date'].unique(), key=lambda x: datetime.strptime(x, '%d/%m/%Y')))
         cols = st.columns(len(AGENTS))
         for i, a in enumerate(AGENTS):
             with cols[i]:
                 st.markdown(f"<div style='text-align:center; background-color:{COULEURS[a]}; padding:10px; border-radius:5px; color:black; font-weight:bold;'>{a}</div>", unsafe_allow_html=True)
                 m = st.session_state.db[(st.session_state.db['Date'] == sel_j) & (st.session_state.db['Agent'] == a)].sort_values('Heure')
                 for _, r in m.iterrows():
-                    if r['Heure'] == "⚠️ CONFLIT": st.error(f"❌ **CONFLIT**\n\n{r['Heure']} - {r['Batiment']}")
+                    if r['Heure'] == "⚠️ CONFLIT": st.error(f"❌ CONFLIT : {r['Batiment']}")
                     else:
                         box = st.warning if r['Statut'] != "" else st.info
                         box(f"🕒 **{r['Heure']}**\n\n**{r['Batiment']}**")
         
         non_attrib = st.session_state.db[(st.session_state.db['Date'] == sel_j) & (st.session_state.db['Agent'] == "⚠️ SANS AGENT")]
         if not non_attrib.empty:
-            st.error("⚠️ **MISSIONS NON ATTRIBUÉES :**")
-            for _, r in non_attrib.iterrows(): st.write(f"❌ {r['Batiment']} ({r['Type']})")
+            st.error("⚠️ MISSIONS NON ATTRIBUÉES :")
+            for _, r in non_attrib.iterrows(): st.write(f"❌ {r['Batiment']}")
 
 with t3:
     st.markdown("<style>[data-testid='stMetricValue'], [data-testid='stMetricLabel'], .stMarkdown p, h3 {color: black !important;} table td, table th {color: black !important; font-weight: 500 !important;} .stTable {color: black !important;}</style>", unsafe_allow_html=True)
     if not st.session_state.db.empty:
         df_rep = st.session_state.db.copy()
         df_rep['Mois'] = df_rep['Date_Sort'].dt.strftime('%B %Y')
-        mois_sel = st.selectbox("Choisir le mois :", df_rep['Mois'].unique())
+        mois_sel = st.selectbox("Mois :", df_rep['Mois'].unique())
         df_mois = df_rep[df_rep['Mois'] == mois_sel]
         c1, c2, c3 = st.columns(3)
-        c1.metric("Total Missions", len(df_mois))
-        c2.metric("📈 Entrées", df_mois[df_mois['Type'].str.contains('Entrée|In', case=False)].shape[0])
-        c3.metric("📉 Sorties", df_mois[df_mois['Type'].str.contains('Sortie|Out', case=False)].shape[0])
-
-st.caption("v2.8 - Présentation CHUV - Unité Logement")
+        c1.metric("Total", len(df_mois))
+        c2.metric("Entrées", df_mois[df_mois['Type'].str.contains('Entrée|In', case=False)].shape[0])
+        c3.metric("Sorties", df_mois[df_mois['Type'].str.contains('Sortie|Out', case=False)].shape[0])
