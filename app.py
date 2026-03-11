@@ -3,17 +3,20 @@ import pandas as pd
 from datetime import datetime, timedelta
 import io
 
-# --- CONFIGURATION FIXE ---
+# --- CONFIGURATION ---
 BUREAU = "Chemin Mont-Paisible 18, 1011 Lausanne"
 AGENTS = ["Celine", "Maria Claret", "Maria Elisabeth"]
+
+# Ajout des coordonnées pour la cartographie
 INFOS_BATIMENTS = {
-    'Bethusy A': 'Avenue de Béthusy 54, Lausanne',
-    'Bethusy B': 'Avenue de Béthusy 56, Lausanne',
-    'Montolieu A': 'Isabelle-de-Montolieu 90, Lausanne',
-    'Montolieu B': 'Isabelle-de-Montolieu 92, Lausanne',
-    'Tunnel': 'Rue du Tunnel 17, Lausanne',
-    'Oron': "Route d'Oron 77, 1010 Lausanne"
+    'Bethusy A': {'rue': 'Avenue de Béthusy 54, Lausanne', 'lat': 46.5225, 'lon': 6.6472},
+    'Bethusy B': {'rue': 'Avenue de Béthusy 56, Lausanne', 'lat': 46.5227, 'lon': 6.6475},
+    'Montolieu A': {'rue': 'Isabelle-de-Montolieu 90, Lausanne', 'lat': 46.5412, 'lon': 6.6421},
+    'Montolieu B': {'rue': 'Isabelle-de-Montolieu 92, Lausanne', 'lat': 46.5415, 'lon': 6.6425},
+    'Tunnel': {'rue': 'Rue du Tunnel 17, Lausanne', 'lat': 46.5255, 'lon': 6.6328},
+    'Oron': {'rue': "Route d'Oron 77, 1010 Lausanne", 'lat': 46.5361, 'lon': 6.6625}
 }
+
 COULEURS = {"Celine": "#d1e9ff", "Maria Claret": "#ffdae0", "Maria Elisabeth": "#d4f8d4", "À définir": "#eeeeee"}
 
 st.set_page_config(page_title="Unité Logement - Gestion Planning", layout="wide")
@@ -38,7 +41,7 @@ def calculer_creneau_securise(agent, date_str, temp_db, batiment_cible, bloc_imp
 
     try:
         h_obj = datetime.strptime(h_depart_str, "%H:%M")
-        rue_cible = INFOS_BATIMENTS.get(batiment_cible, "Autre")
+        rue_cible = INFOS_BATIMENTS.get(batiment_cible, {}).get('rue', "Autre")
         derniere_rue = m_jour.iloc[-1]['Rue'] if not m_jour.empty else "Bureau"
         
         delai = 65 if derniere_rue == rue_cible else 80 
@@ -84,7 +87,8 @@ with st.sidebar:
         for _, row in df_ex.sort_values(by=[c_date, c_heure]).iterrows():
             dt_raw = pd.to_datetime(row[c_date])
             ds = dt_raw.strftime('%d/%m/%Y')
-            rue_demandee = INFOS_BATIMENTS.get(row['Batiment'], "Autre")
+            info_b = INFOS_BATIMENTS.get(row['Batiment'], {'rue': 'Autre'})
+            rue_demandee = info_b['rue']
             statut_val = str(row[c_statut]).strip()
             h_excel = str(row[c_heure]).strip()[:5] if str(row[c_heure]).strip() not in ["", "nan", "libre"] else None
 
@@ -117,20 +121,13 @@ with st.sidebar:
         st.session_state.db = temp
         st.rerun()
 
-    st.subheader("💾 Exportation")
     if not st.session_state.db.empty:
-        # Préparation du fichier Excel en mémoire
         output = io.BytesIO()
         df_export = st.session_state.db.sort_values(['Date_Sort', 'Heure']).drop(columns=['Date_Sort'])
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
             df_export.to_excel(writer, index=False, sheet_name='Planning')
         
-        st.download_button(
-            label="📥 Télécharger le Planning (Excel)",
-            data=output.getvalue(),
-            file_name=f"Planning_Logement_{datetime.now().strftime('%Y%m%d')}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+        st.download_button("📥 Télécharger Excel", output.getvalue(), f"Planning_{datetime.now().strftime('%Y%m%d')}.xlsx")
 
     if st.button("🗑️ Reset Complet"):
         st.session_state.db = pd.DataFrame(columns=['Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Type', 'Statut', 'Date_Sort'])
@@ -147,7 +144,7 @@ with t1:
             if s['Statut'] != "": return [f'background-color: {color}; border: 2px solid orange']*7
             return [f'background-color: {color}']*7
 
-        st.dataframe(df_v[['Date', 'Statut', 'Heure', 'Agent', 'Batiment', 'Type', 'Rue']].style.apply(style_row, axis=1), use_container_width=True, height=500)
+        st.dataframe(df_v[['Date', 'Statut', 'Heure', 'Agent', 'Batiment', 'Type', 'Rue']].style.apply(style_row, axis=1), use_container_width=True, height=400)
 
 with t2:
     if not st.session_state.db.empty:
@@ -158,24 +155,10 @@ with t2:
                 st.markdown(f"<div style='text-align:center; background-color:{COULEURS[a]}; padding:10px; border-radius:5px; color:black; font-weight:bold;'>{a}</div>", unsafe_allow_html=True)
                 m = st.session_state.db[(st.session_state.db['Date'] == sel_j) & (st.session_state.db['Agent'] == a)].sort_values('Heure')
                 for _, r in m.iterrows():
-                    if r['Heure'] == "⚠️ CONFLIT": st.error(f"❌ **CONFLIT**\n\n{r['Heure']} - {r['Batiment']}")
-                    else:
-                        box = st.warning if r['Statut'] != "" else st.info
-                        box(f"🕒 **{r['Heure']}**\n\n**{r['Batiment']}**")
-        
-        non_attrib = st.session_state.db[(st.session_state.db['Date'] == sel_j) & (st.session_state.db['Agent'] == "⚠️ SANS AGENT")]
-        if not non_attrib.empty:
-            st.error("⚠️ **MISSIONS NON ATTRIBUÉES :**")
-            for _, r in non_attrib.iterrows(): st.write(f"❌ {r['Batiment']} ({r['Type']})")
+                    box = st.error if r['Heure'] == "⚠️ CONFLIT" else (st.warning if r['Statut'] != "" else st.info)
+                    box(f"🕒 **{r['Heure']}**\n\n**{r['Batiment']}**")
 
 with t3:
-    st.markdown("""
-        <style>
-        [data-testid="stMetricValue"], [data-testid="stMetricLabel"], .stMarkdown p {color: black !important;}
-        .stTable td, .stTable th {color: black !important; font-weight: 600 !important; font-size: 1.05rem !important;}
-        </style>
-    """, unsafe_allow_html=True)
-
     if not st.session_state.db.empty:
         df_rep = st.session_state.db.copy()
         df_rep['Mois'] = df_rep['Date_Sort'].dt.strftime('%B %Y')
@@ -188,11 +171,30 @@ with t3:
         c3.metric("📉 Sorties", df_mois[df_mois['Type'].str.contains('Sortie|Out', case=False)].shape[0])
         
         st.divider()
-        st.subheader(f"🏠 Volume par bâtiment ({mois_sel})")
-        stats_bat = df_mois.groupby('Batiment').size().reset_index(name='Nombre de missions')
-        stats_bat = stats_bat.sort_values(by='Nombre de missions', ascending=False)
-        st.table(stats_bat)
-    else:
-        st.info("Veuillez importer des données pour générer le rapport.")
+        col_left, col_right = st.columns([1, 1])
+        
+        with col_left:
+            st.subheader("🏠 Volume par bâtiment")
+            stats_bat = df_mois.groupby('Batiment').size().reset_index(name='Missions').sort_values('Missions', ascending=False)
+            st.table(stats_bat)
 
-st.caption("v2.9 - Démo Cheffe Unité Logement")
+        with col_right:
+            st.subheader("📍 Cartographie")
+            map_data = []
+            for _, row in stats_bat.iterrows():
+                if row['Batiment'] in INFOS_BATIMENTS:
+                    map_data.append({
+                        'lat': INFOS_BATIMENTS[row['Batiment']]['lat'],
+                        'lon': INFOS_BATIMENTS[row['Batiment']]['lon'],
+                        'Missions': row['Missions']
+                    })
+            if map_data:
+                df_map = pd.DataFrame(map_data)
+                # Taille des points basée sur le nombre de missions
+                st.map(df_map, latitude='lat', longitude='lon', size=df_map['Missions'] * 20, color="#FF4B4B")
+            else:
+                st.info("Aucune donnée géographique à afficher.")
+    else:
+        st.info("Veuillez importer des données.")
+
+st.caption("v3.0 - Edition Cartographique")
