@@ -74,7 +74,7 @@ with st.sidebar:
             ds = dt_raw.strftime('%d/%m/%Y')
             rue_demandee = INFOS_BATIMENTS.get(row['Batiment'], "Autre")
             
-            # Gestion robuste des absences
+            # Gestion robuste des absences (gestion tirets, espaces et casse)
             absents_du_jour = []
             if c_absent and str(row[c_absent]).strip() != "":
                 absents_du_jour = [a.strip().lower().replace('-', ' ') for a in str(row[c_absent]).split(';')]
@@ -144,8 +144,7 @@ with t3:
         
         df_mois = df_rep[df_rep['Mois'] == mois_sel]
         
-        # Calcul des Entrées / Sorties
-        # On considère 'Entrée' si le mot est dans le type, sinon 'Sortie' (ou à adapter selon tes libellés)
+        # Calcul des Entrées / Sorties basés sur le texte de la colonne 'Type'
         entrees = df_mois[df_mois['Type'].str.contains('Entrée|entree|In', case=False)].shape[0]
         sorties = df_mois[df_mois['Type'].str.contains('Sortie|sortie|Out', case=False)].shape[0]
         total = len(df_mois)
@@ -164,7 +163,10 @@ with t3:
         
         with col_right:
             st.write("**Répartition par Bâtiment**")
-            st.table(df_mois['Batiment'].value_counts())
+            # Transformation pour afficher le titre "Total"
+            stats_bat = df_mois['Batiment'].value_counts().reset_index()
+            stats_bat.columns = ['Bâtiment', 'Total']
+            st.table(stats_bat.set_index('Bâtiment'))
             
     else:
         st.info("Veuillez importer des données pour voir les rapports.")
