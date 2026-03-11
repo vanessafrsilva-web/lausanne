@@ -6,7 +6,6 @@ import plotly.express as px
 import numpy as np
 
 # --- CONFIGURATION ---
-# Mise à jour de l'adresse et des coordonnées GPS (Mont-Paisible 18)
 BUREAU_ADRESSE = "Chemin Mont-Paisible 18, 1011 Lausanne"
 BUREAU_GPS = (46.5332, 6.6135) 
 AGENTS = ["Celine", "Maria Claret", "Maria Elisabeth"]
@@ -24,10 +23,10 @@ COULEURS = {"Celine": "#d1e9ff", "Maria Claret": "#ffdae0", "Maria Elisabeth": "
 
 st.set_page_config(page_title="Unité Logement - Gestion Planning", layout="wide", page_icon="📍")
 
-# --- FONCTION DISTANCE (Haversine) ---
+# --- FONCTION DISTANCE ---
 def calculer_distance(pos1, pos2):
     if not pos1 or not pos2: return 0
-    R = 6371.0 # Rayon de la Terre en km
+    R = 6371.0
     lat1, lon1 = np.radians(pos1[0]), np.radians(pos1[1])
     lat2, lon2 = np.radians(pos2[0]), np.radians(pos2[1])
     dlon = lon2 - lon1
@@ -58,15 +57,12 @@ def calculer_creneau_securise(agent, date_str, temp_db, batiment_cible, bloc_imp
         derniere_rue = m_jour.iloc[-1]['Rue'] if not m_jour.empty else "Bureau"
         delai = 65 if derniere_rue == rue_cible else 80 
         prochaine_h = h_obj + timedelta(minutes=delai) if not m_jour.empty else h_obj
-        
         if datetime.strptime("12:00", "%H:%M") <= prochaine_h < datetime.strptime("13:00", "%H:%M"):
             prochaine_h = datetime.strptime("13:00", "%H:%M")
-        
         if bloc_impose == "Matin" and prochaine_h > datetime.strptime("11:45", "%H:%M"):
             return "COMPLET MATIN", False
         if prochaine_h > datetime.strptime("16:30", "%H:%M"):
             return "COMPLET JOUR", False
-            
         return prochaine_h.strftime("%H:%M"), True
     except:
         return "08:15", True
@@ -167,59 +163,73 @@ with t2:
                     st.markdown(f"<div style='background-color:{color}; padding:8px; border-radius:5px; border:1px solid #ccc; color:black; margin-top:5px;'>🆔 <b>{r['ID']}</b><br>🕒 <b>{r['Heure']}</b><br>🏠 {r['Batiment']}</div>", unsafe_allow_html=True)
 
 with t3:
-    if not st.session_state.db.empty:
+    if st.session_state.db.empty:
+        st.info("Importez un fichier Excel pour voir les analyses.")
+    else:
         df_rep = st.session_state.db.copy()
         df_rep['Mois'] = df_rep['Date_Sort'].dt.strftime('%B %Y')
-        mois_sel = st.selectbox("📅 Mois :", df_rep['Mois'].unique())
-        df_mois = df_rep[df_rep['Mois'] == mois_sel]
-        agents_sel = st.multiselect("👤 Agents :", sorted(df_mois['Agent'].unique()), default=[a for a in df_mois['Agent'].unique() if a != "⚠️ SANS AGENT"])
-        df_final = df_mois[df_mois['Agent'].isin(agents_sel)]
+        
+        col_f1, col_f2 = st.columns(2)
+        mois_sel = col_f1.selectbox("📅 Choisir le Mois :", df_rep['Mois'].unique())
+        
+        # Correction : On force la sélection des agents pour être sûr d'avoir des chiffres
+        options_agents = [a for a in df_rep['Agent'].unique() if a != "⚠️ SANS AGENT"]
+        agents_sel = col_f2.multiselect("👤 Sélectionner Agents :", options_agents, default=options_agents)
+        
+        df_final = df_rep[(df_rep['Mois'] == mois_sel) & (df_rep['Agent'].isin(agents_sel))]
 
-        if not df_final.empty:
-            total_km = 0
+        if df_final.empty:
+            st.warning("Aucune donnée pour cette sélection (Mois/Agents).")
+        else:
+            # --- CALCULS ---
+            total_km = 0.0
             groupes = 0
-            total_missions = len(df_final)
-            
             for agent in agents_sel:
                 df_agt = df_final[df_final['Agent'] == agent].sort_values(['Date_Sort', 'Heure'])
                 for jour in df_agt['Date'].unique():
-                    missions_jour = df_agt[df_agt['Date'] == jour]
-                    prev_coords = BUREAU_GPS # Départ de Mont-Paisible 18
-                    for i, (idx, row) in enumerate(missions_jour.iterrows()):
+                    missions_j = df_agt[df_agt['Date'] == jour]
+                    prev_coords = BUREAU_GPS
+                    for i, (_, row) in enumerate(missions_j.iterrows()):
                         curr_b = row['Batiment']
-                        curr_coords = (INFOS_BATIMENTS[curr_b]['lat'], INFOS_BATIMENTS[curr_b]['lon']) if curr_b in INFOS_BATIMENTS else BUREAU_GPS
-                        total_km += calculer_distance(prev_coords, curr_coords)
-                        if i > 0 and curr_b == missions_jour.iloc[i-1]['Batiment']:
+                        coords = (INFOS_BATIMENTS[curr_b]['lat'], INFOS_BATIMENTS[curr_b]['lon']) if curr_b in INFOS_BATIMENTS else BUREAU_GPS
+                        total_km += calculer_distance(prev_coords, coords)
+                        if i > 0 and curr_b == missions_j.iloc[i-1]['Batiment']:
                             groupes += 1
-                        prev_coords = curr_coords
-                    total_km += calculer_distance(prev_coords, BUREAU_GPS) # Retour à Mont-Paisible 18
+                        prev_coords = coords
+                    total_km += calculer_distance(prev_coords, BUREAU_GPS)
 
-            tx_opti = (groupes / total_missions * 100) if total_missions > 0 else 0
+            tx_opti = (groupes / len(df_final) * 100) if len(df_final) > 0 else 0
 
-            c1, c2, c3, c4 = st.columns(4)
-            c1.metric("Missions", total_missions)
-            c2.metric("📈 Taux Opti.", f"{tx_opti:.1f}%", help="Missions groupées dans le même bâtiment")
-            c3.metric("🚗 Est. Trajets", f"{total_km:.1f} km", help="Kilométrage total estimé (Aller/Retour Bureau inclus)")
-            c4.metric("📅 Jours", df_final['Date'].nunique())
+            # --- AFFICHAGE METRICS ---
+            m1, m2, m3, m4 = st.columns(4)
+            m1.metric("Missions", len(df_final))
+            m2.metric("📈 Taux Opti.", f"{tx_opti:.1f}%")
+            m3.metric("🚗 Est. Trajets", f"{total_km:.1f} km")
+            m4.metric("📅 Jours", df_final['Date'].nunique())
             
             st.divider()
-            st.subheader("📊 Charge de travail hebdomadaire")
+            
+            # Graphique
             df_chart = df_final.copy()
             df_chart['Semaine'] = df_chart['Date_Sort'].dt.isocalendar().week
             df_chart['Nom_Semaine'] = "Semaine " + df_chart['Semaine'].astype(str)
             fig = px.histogram(df_chart.sort_values('Semaine'), x='Nom_Semaine', color='Agent', 
-                               color_discrete_map=COULEURS, barmode='group', text_auto=True)
+                               color_discrete_map=COULEURS, barmode='group', text_auto=True,
+                               title="Volume de missions par semaine")
             st.plotly_chart(fig, use_container_width=True)
 
-            st.divider()
             cl, cr = st.columns(2)
             with cl:
-                st.subheader("🏠 Par bâtiment")
+                st.subheader("🏠 Volume par bâtiment")
                 st.table(df_final.groupby('Batiment').size().reset_index(name='Missions').sort_values('Missions', ascending=False))
             with cr:
                 st.subheader("📍 Carte")
-                st.map(pd.DataFrame([{'lat': INFOS_BATIMENTS[b]['lat'], 'lon': INFOS_BATIMENTS[b]['lon'], 'Missions': count} 
-                       for b, count in df_final.groupby('Batiment').size().items() if b in INFOS_BATIMENTS]))
+                map_data = []
+                for b, count in df_final.groupby('Batiment').size().items():
+                    if b in INFOS_BATIMENTS:
+                        map_data.append({'lat': INFOS_BATIMENTS[b]['lat'], 'lon': INFOS_BATIMENTS[b]['lon'], 'Missions': count})
+                if map_data:
+                    st.map(pd.DataFrame(map_data))
 
 st.divider()
-st.caption(f"v3.5 | {datetime.now().year}")
+st.caption(f"v3.6 | {datetime.now().year}")
