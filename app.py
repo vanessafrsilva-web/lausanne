@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
+import io
 
 # --- CONFIGURATION FIXE ---
 BUREAU = "Chemin Mont-Paisible 18, 1011 Lausanne"
@@ -116,6 +117,21 @@ with st.sidebar:
         st.session_state.db = temp
         st.rerun()
 
+    st.subheader("💾 Exportation")
+    if not st.session_state.db.empty:
+        # Préparation du fichier Excel en mémoire
+        output = io.BytesIO()
+        df_export = st.session_state.db.sort_values(['Date_Sort', 'Heure']).drop(columns=['Date_Sort'])
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            df_export.to_excel(writer, index=False, sheet_name='Planning')
+        
+        st.download_button(
+            label="📥 Télécharger le Planning (Excel)",
+            data=output.getvalue(),
+            file_name=f"Planning_Logement_{datetime.now().strftime('%Y%m%d')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+
     if st.button("🗑️ Reset Complet"):
         st.session_state.db = pd.DataFrame(columns=['Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Type', 'Statut', 'Date_Sort'])
         st.rerun()
@@ -153,7 +169,6 @@ with t2:
             for _, r in non_attrib.iterrows(): st.write(f"❌ {r['Batiment']} ({r['Type']})")
 
 with t3:
-    # Styles pour forcer le noir sur les métriques et les tableaux
     st.markdown("""
         <style>
         [data-testid="stMetricValue"], [data-testid="stMetricLabel"], .stMarkdown p {color: black !important;}
@@ -167,24 +182,17 @@ with t3:
         mois_sel = st.selectbox("Choisir le mois :", df_rep['Mois'].unique())
         df_mois = df_rep[df_rep['Mois'] == mois_sel]
         
-        # --- RÉSUMÉ ---
         c1, c2, c3 = st.columns(3)
         c1.metric("Total Missions", len(df_mois))
         c2.metric("📈 Entrées", df_mois[df_mois['Type'].str.contains('Entrée|In', case=False)].shape[0])
         c3.metric("📉 Sorties", df_mois[df_mois['Type'].str.contains('Sortie|Out', case=False)].shape[0])
         
         st.divider()
-        
-        # --- ÉTATS DES LIEUX PAR BÂTIMENT ---
         st.subheader(f"🏠 Volume par bâtiment ({mois_sel})")
-        
-        # Groupement par bâtiment et tri par volume
         stats_bat = df_mois.groupby('Batiment').size().reset_index(name='Nombre de missions')
         stats_bat = stats_bat.sort_values(by='Nombre de missions', ascending=False)
-        
-        # Affichage du tableau (le CSS ci-dessus force le texte en noir)
         st.table(stats_bat)
     else:
-        st.info("Veuillez importer des données dans le menu latéral pour générer le rapport.")
+        st.info("Veuillez importer des données pour générer le rapport.")
 
-st.caption("v2.8 - Démo Cheffe Unité Logement")
+st.caption("v2.9 - Démo Cheffe Unité Logement")
