@@ -140,23 +140,27 @@ with st.sidebar:
             st.rerun()
 
 # --- ONGLETS ---
+# --- Remplacement du bloc filtre dans l'onglet t1 ---
 with t1:
     if not st.session_state.db.empty:
-        # --- FILTRE ÉLÉGANT ---
+        # On récupère les agents uniques
         agents_dispo = sorted([a for a in st.session_state.db['Agent'].unique() if a != "⚠️ SANS AGENT"])
         
-        filtre_agt = st.pills(
-            "Filtrer par agent :", 
-            agents_dispo, 
-            selection_mode="multi", 
-            default=agents_dispo
-        )
+        # Version COMPACTE compatible avec toutes les versions de Streamlit
+        # On utilise des colonnes pour mettre les cases à cocher sur une seule ligne rectangulaire
+        st.write("🔍 **Filtrer par agent :**")
+        cols_filtre = st.columns(len(agents_dispo) + 1)
+        selection = []
         
-        # On inclut toujours "SANS AGENT" dans le calcul si présent, mais on filtre sur les autres
-        selection = list(filtre_agt) if filtre_agt else []
+        for i, agent in enumerate(agents_dispo):
+            if cols_filtre[i].checkbox(agent, value=True, key=f"filter_{agent}"):
+                selection.append(agent)
+        
+        # On garde toujours "SANS AGENT" visible s'il y en a
         if "⚠️ SANS AGENT" in st.session_state.db['Agent'].values:
             selection.append("⚠️ SANS AGENT")
 
+        # Application du filtre
         df_v = st.session_state.db[st.session_state.db['Agent'].isin(selection)].sort_values(['Date_Sort', 'Heure'])
         
         if not df_v.empty:
@@ -172,7 +176,7 @@ with t1:
                 height=600
             )
         else:
-            st.info("Sélectionnez un agent pour voir son planning.")
+            st.info("Cochez un agent ci-dessus pour afficher le planning.")
 
 with t2:
     if not st.session_state.db.empty:
