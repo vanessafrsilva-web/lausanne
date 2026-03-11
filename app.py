@@ -314,15 +314,16 @@ with t3:
 
             if not grp_wk.empty:
                 # Création du graphique Plotly Express
+# Création du graphique Plotly Express corrigé
                 fig = px.bar(
                     grp_wk, 
                     x='Nom_Semaine', 
                     y='Nb_Missions', 
                     color='Agent',
                     title=f"Répartition des missions par semaine ({mois_sel})",
-                    color_discrete_map=COULEURS, # Utilisation de vos couleurs définies
-                    text_value='Nb_Missions', # Affiche valeur sur barres
-                    barmode='group' # Barres côte à côte
+                    color_discrete_map=COULEURS,
+                    text='Nb_Missions',  # <-- Corrigé ici (on utilise 'text' au lieu de 'text_value')
+                    barmode='group'
                 )
                 
                 # Amélioration du layout
