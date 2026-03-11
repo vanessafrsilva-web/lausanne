@@ -55,7 +55,7 @@ t1, t2, t3 = st.tabs(["📝 Planning Global", "📅 Vue par Agent", "📊 Rappor
 
 with st.sidebar:
     st.header("📂 Importation")
-    st.info("**Nouveau :** Utilisez la colonne 'Statut' avec la valeur 'Souhaité' pour marquer les demandes locataires.")
+    st.info("**Rappel :** Colonne 'Statut' (Souhaité) et colonne 'Absent' (Nom ; Nom) gérées via Excel.")
     up = st.file_uploader("Fichier Excel des missions", type=['xlsx'])
     
     if up and st.button("🚀 Lancer l'Attribution"):
@@ -75,7 +75,6 @@ with st.sidebar:
             ds = dt_raw.strftime('%d/%m/%Y')
             rue_demandee = INFOS_BATIMENTS.get(row['Batiment'], "Autre")
             
-            # Gestion absences
             absents_du_jour = []
             if c_absent and str(row[c_absent]).strip() != "":
                 absents_du_jour = [a.strip().lower().replace('-', ' ') for a in str(row[c_absent]).split(';')]
@@ -97,7 +96,6 @@ with st.sidebar:
             h_val = str(row[c_heure]).strip()
             if h_val not in ["", "nan", "00:00:00", "libre"]: h_finale = h_val[:5]
 
-            # Récupération du statut
             statut_val = str(row[c_statut]).strip() if c_statut in row else ""
 
             temp = pd.concat([temp, pd.DataFrame([{
@@ -117,17 +115,18 @@ with st.sidebar:
 
 with t1:
     if not st.session_state.db.empty:
-        st.write("💡 *Les lignes en italique avec (S) indiquent un souhait locataire.*")
         df_v = st.session_state.db.sort_values(['Date_Sort', 'Heure'])
         
         def highlight_souhait(s):
             color = COULEURS.get(s['Agent'], "#eeeeee")
             if str(s['Statut']).lower() == "souhaité":
+                # On applique le style sur les 7 colonnes affichées
                 return [f'background-color: {color}; font-weight: bold; border: 2px solid orange']*7
             return [f'background-color: {color}']*7
 
+        # --- ORDRE DES COLONNES MODIFIÉ ICI (Statut avant Heure) ---
         st.dataframe(
-            df_v[['Date', 'Heure', 'Agent', 'Batiment', 'Type', 'Statut', 'Rue']].style.apply(highlight_souhait, axis=1),
+            df_v[['Date', 'Statut', 'Heure', 'Agent', 'Batiment', 'Type', 'Rue']].style.apply(highlight_souhait, axis=1),
             use_container_width=True, height=500
         )
 
@@ -176,7 +175,7 @@ with t3:
             stats_bat.columns = ['Bâtiment', 'Total']
             st.table(stats_bat.set_index('Bâtiment'))
     else:
-        st.info("Importez des données.")
+        st.info("Importez des données pour générer les rapports.")
 
 st.divider()
 st.caption("v2.2 - Unité Logement")
