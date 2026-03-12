@@ -19,11 +19,23 @@ INFOS_BATIMENTS = {
     'Oron': {'rue': "Route d'Oron 77, 1010 Lausanne", 'lat': 46.5361, 'lon': 6.6625}
 }
 
+SECTEURS = {
+    'Bethusy': ['Bethusy A', 'Bethusy B'],
+    'Montolieu': ['Montolieu A', 'Montolieu B'],
+    'Tunnel': ['Tunnel'],
+    'Oron': ['Oron']
+}
+
 COULEURS = {"Celine": "#d1e9ff", "Maria Claret": "#ffdae0", "Maria Elisabeth": "#d4f8d4", "⚠️ SANS AGENT": "#eeeeee"}
 
 st.set_page_config(page_title="Unité Logement - Gestion Planning", layout="wide", page_icon="📍")
 
 # --- FONCTIONS TECHNIQUES ---
+def trouver_secteur(batiment):
+    for secteur, liste in SECTEURS.items():
+        if batiment in liste: return secteur
+    return batiment 
+
 def calculer_distance(pos1, pos2):
     if not pos1 or not pos2: return 0
     R = 6371.0
@@ -34,6 +46,25 @@ def calculer_distance(pos1, pos2):
     a = np.sin(dlat / 2)**2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon / 2)**2
     c = 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
     return R * c
+
+def generer_ics(df_agent):
+    ics_content = "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Unite Logement//Planning//FR\n"
+    for _, row in df_agent.iterrows():
+        try:
+            date_obj = datetime.strptime(row['Date'], '%d/%m/%Y')
+            heure_obj = datetime.strptime(row['Heure'], '%H:%M')
+            start = date_obj.replace(hour=heure_obj.hour, minute=heure_obj.minute)
+            end = start + timedelta(minutes=60)
+            ics_content += "BEGIN:VEVENT\n"
+            ics_content += f"SUMMARY:Mission {row['ID']} - {row['Batiment']}\n"
+            ics_content += f"DTSTART:{start.strftime('%Y%m%dT%H%M%S')}\n"
+            ics_content += f"DTEND:{end.strftime('%Y%m%dT%H%M%S')}\n"
+            ics_content += f"LOCATION:{row['Rue']}\n"
+            ics_content += f"DESCRIPTION:Type: {row['Type']}\n"
+            ics_content += "END:VEVENT\n"
+        except: continue
+    ics_content += "END:VCALENDAR"
+    return ics_content
 
 if 'db' not in st.session_state:
     st.session_state.db = pd.DataFrame(columns=['ID', 'Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Type', 'Statut', 'Date_Sort'])
@@ -69,7 +100,6 @@ with st.sidebar:
         try:
             df_ex = pd.read_excel(up).dropna(how='all').fillna('')
             df_ex.columns = df_ex.columns.str.strip()
-            
             c_id = next((c for c in df_ex.columns if 'id' in c.lower() or 'n°' in c.lower()), df_ex.columns[0])
             c_date = next((c for c in df_ex.columns if 'date' in c.lower()), 'Date')
             c_statut = next((c for c in df_ex.columns if 'statut' in c.lower()), 'Statut')
@@ -79,12 +109,9 @@ with st.sidebar:
 
             temp_rows = []
             df_ex[c_date] = pd.to_datetime(df_ex[c_date])
-            
             for jour in sorted(df_ex[c_date].unique()):
                 ds = pd.to_datetime(jour).strftime('%d/%m/%Y')
                 df_j = df_ex[df_ex[c_date] == jour].copy()
-                
-                # Distribution par Bâtiment (Finit un bâtiment avant l'autre)
                 for bat_nom in df_j[c_bat].unique():
                     df_b = df_j[df_j[c_bat] == bat_nom]
                     idx_agt = 0
@@ -92,7 +119,6 @@ with st.sidebar:
                         bloc = "Après-midi" if "midi" in str(row[c_statut]).lower() else "Matin"
                         absents = [a.strip().lower() for a in str(row[c_absent]).split(';')] if c_absent else []
                         presents = [a for a in AGENTS if a.lower() not in absents]
-                        
                         agt_elu, h_fin = "⚠️ SANS AGENT", "08:15"
                         if presents:
                             db_actuel = pd.DataFrame(temp_rows) if temp_rows else pd.DataFrame(columns=['Date', 'Agent', 'Heure', 'Rue'])
@@ -104,19 +130,16 @@ with st.sidebar:
                                     idx_agt += 1
                                     break
                                 idx_agt += 1
-
                         temp_rows.append({
                             'ID': row[c_id], 'Batiment': bat_nom, 'Date': ds, 'Heure': h_fin, 
                             'Agent': agt_elu, 'Type': str(row[c_type]), 'Rue': INFOS_BATIMENTS.get(bat_nom, {}).get('rue', ''), 
                             'Statut': bloc, 'Date_Sort': jour
                         })
-
             st.session_state.db = pd.DataFrame(temp_rows)
             st.rerun()
         except Exception as e:
-            st.error(f"Erreur d'attribution : {e}")
+            st.error(f"Erreur : {e}")
 
-# --- AFFICHAGE ---
 if not st.session_state.db.empty:
     with t1:
         df_v = st.session_state.db.sort_values(['Date_Sort', 'Heure'])
@@ -127,14 +150,11 @@ if not st.session_state.db.empty:
         
         st.divider()
         st.markdown("### 📥 Exportation")
-        col_dl1, col_dl2 = st.columns([1, 1])
-        
-        # 1. Liste standard
+        col_dl1, col_dl2 = st.columns(2)
         out_std = io.BytesIO()
         df_v.drop(columns=['Date_Sort']).to_excel(out_std, index=False)
         col_dl1.download_button("📄 Télécharger Liste Standard", out_std.getvalue(), "Planning_Liste.xlsx", use_container_width=True)
         
-        # 2. Version par agent
         df_pivot = df_v.copy()
         df_pivot['Contenu'] = df_pivot['Batiment'] + " (ID:" + df_pivot['ID'].astype(str) + ")"
         df_visual = df_pivot.pivot_table(index=['Date', 'Heure'], columns='Agent', values='Contenu', aggfunc='first').reset_index().fillna('')
@@ -142,12 +162,22 @@ if not st.session_state.db.empty:
         df_visual.to_excel(out_vis, index=False)
         col_dl2.download_button("✨ Télécharger Version par Agent", out_vis.getvalue(), "Planning_Equipe.xlsx", type="primary", use_container_width=True)
 
+        st.divider()
+        st.markdown("### 📅 Synchronisation Outlook")
+        st.caption("Télécharge le fichier de ton agente pour synchroniser son calendrier.")
+        cols_ics = st.columns(len(AGENTS))
+        for i, agt in enumerate(AGENTS):
+            df_agt_ics = df_v[df_v['Agent'] == agt]
+            if not df_agt_ics.empty:
+                ics_data = generer_ics(df_agt_ics)
+                cols_ics[i].download_button(f"Sync Outlook - {agt}", data=ics_data, file_name=f"Planning_{agt}.ics", mime="text/calendar", use_container_width=True)
+
     with t2:
         dates_j = sorted(st.session_state.db['Date'].unique(), key=lambda x: datetime.strptime(x, '%d/%m/%Y'))
         sel_j = st.selectbox("📅 Sélectionner une date :", dates_j)
-        cols = st.columns(len(AGENTS))
+        cols_v = st.columns(len(AGENTS))
         for i, a in enumerate(AGENTS):
-            with cols[i]:
+            with cols_v[i]:
                 st.markdown(f"<div style='text-align:center; background-color:{COULEURS[a]}; padding:10px; border-radius:5px; color:black; font-weight:bold;'>{a}</div>", unsafe_allow_html=True)
                 m = st.session_state.db[(st.session_state.db['Date'] == sel_j) & (st.session_state.db['Agent'] == a)].sort_values('Heure')
                 for _, r in m.iterrows():
@@ -157,11 +187,9 @@ if not st.session_state.db.empty:
         df_rep = st.session_state.db.copy()
         df_rep['Date_Sort'] = pd.to_datetime(df_rep['Date_Sort'])
         df_rep['Mois'] = df_rep['Date_Sort'].dt.strftime('%B %Y')
-        col_f1, col_f2 = st.columns(2)
-        mois_sel = col_f1.selectbox("📅 Mois :", df_rep['Mois'].unique())
-        agents_sel = col_f2.multiselect("👤 Agents :", AGENTS, default=AGENTS)
+        mois_sel = st.selectbox("📅 Mois :", df_rep['Mois'].unique())
+        agents_sel = st.multiselect("👤 Agents :", AGENTS, default=AGENTS)
         df_f = df_rep[(df_rep['Mois'] == mois_sel) & (df_rep['Agent'].isin(agents_sel))].copy()
-
         if not df_f.empty:
             total_km = 0.0
             for agent in agents_sel:
@@ -177,7 +205,6 @@ if not st.session_state.db.empty:
                             total_km += calculer_distance(pt_actuel, dest)
                             pt_actuel = dest
                     total_km += calculer_distance(pt_actuel, BUREAU_GPS)
-
             st.markdown("### 📊 Indicateurs Clés")
             c1, c2, c3, c4 = st.columns(4)
             c1.metric("Total Missions", len(df_f))
@@ -186,14 +213,12 @@ if not st.session_state.db.empty:
             nb_sor = df_f[df_f['Type'].str.contains('Sortie|Out', case=False, na=False)].shape[0]
             c3.metric("📈 Total Entrées", nb_ent)
             c4.metric("📉 Total Sorties", nb_sor)
-
-            st.divider()
-            st.plotly_chart(px.histogram(df_f, x='Date', color='Agent', barmode='group', color_discrete_map=COULEURS, title="Volume par jour"), use_container_width=True)
-else:
-    st.info("Importez un fichier Excel pour commencer.")
+            st.plotly_chart(px.histogram(df_f, x='Date', color='Agent', barmode='group', color_discrete_map=COULEURS), use_container_width=True)
+            st.subheader("🏠 Volume par bâtiment")
+            st.table(df_f.groupby('Batiment').size().reset_index(name='Missions').sort_values('Missions', ascending=False))
 
 if st.sidebar.button("🗑️ Reset"):
     st.session_state.db = pd.DataFrame(columns=['ID', 'Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Type', 'Statut', 'Date_Sort'])
     st.rerun()
 
-st.caption(f"v4.6 | {datetime.now().year}")
+st.caption(f"v4.7 | {datetime.now().year}")
