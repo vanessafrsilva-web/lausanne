@@ -35,7 +35,7 @@ def trouver_secteur(batiment):
 
 st.set_page_config(page_title="Unité Logement - Gestion Planning", layout="wide", page_icon="📍")
 
-# --- FONCTIONS ---
+# --- FONCTIONS TECHNIQUES ---
 def calculer_distance(pos1, pos2):
     if not pos1 or not pos2: return 0
     R = 6371.0
@@ -82,6 +82,7 @@ with st.sidebar:
             df_ex = pd.read_excel(up).dropna(how='all').fillna('')
             df_ex.columns = df_ex.columns.str.strip()
             
+            # Identification des colonnes
             c_id = next((c for c in df_ex.columns if 'id' in c.lower() or 'n°' in c.lower()), df_ex.columns[0])
             c_date = next((c for c in df_ex.columns if 'date' in c.lower()), 'Date')
             c_statut = next((c for c in df_ex.columns if 'statut' in c.lower()), 'Statut')
@@ -92,12 +93,12 @@ with st.sidebar:
             temp_rows = []
             df_ex[c_date] = pd.to_datetime(df_ex[c_date])
             
-            # --- LOGIQUE : JOUR -> SECTEUR -> BÂTIMENT ---
+            # LOGIQUE : On traite Jour par Jour
             for jour in sorted(df_ex[c_date].unique()):
                 ds = pd.to_datetime(jour).strftime('%d/%m/%Y')
                 df_j = df_ex[df_ex[c_date] == jour].copy()
                 
-                # Traitement par Bâtiment pour ne pas mélanger le 90 et le 92 trop tôt
+                # OPTIMISATION : On traite bâtiment par bâtiment (ex: tout le 90, puis tout le 92)
                 for bat_nom in df_j[c_bat].unique():
                     df_b = df_j[df_j[c_bat] == bat_nom]
                     
@@ -109,8 +110,9 @@ with st.sidebar:
                         
                         agt_elu, h_fin = "⚠️ SANS AGENT", "08:15"
                         if presents:
-                            # Calcul basé sur ce qui est déjà attribué
+                            # Calcul basé sur ce qui est déjà mis en mémoire dans temp_rows
                             db_actuel = pd.DataFrame(temp_rows) if temp_rows else pd.DataFrame(columns=['Date', 'Agent', 'Heure', 'Rue'])
+                            
                             for _ in range(len(presents)):
                                 p = presents[idx_agt % len(presents)]
                                 res_h, possible = calculer_creneau(p, ds, db_actuel, bat_nom, bloc)
@@ -130,27 +132,30 @@ with st.sidebar:
             st.session_state.db = pd.DataFrame(temp_rows)
             st.rerun()
         except Exception as e:
-            st.error(f"Erreur : {e}")
+            st.error(f"Erreur d'importation : {e}")
 
     if not st.session_state.db.empty:
         st.divider()
-        df_export = st.session_state.db.sort_values(['Date_Sort', 'Heure']).drop(columns=['Date_Sort'])
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            df_export.to_excel(writer, index=False)
-        st.download_button("📥 Télécharger Excel", output.getvalue(), "Planning.xlsx")
         if st.button("🗑️ Reset"):
             st.session_state.db = pd.DataFrame(columns=['ID', 'Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Type', 'Statut', 'Date_Sort'])
             st.rerun()
 
-# --- AFFICHAGE ---
+# --- ONGLETS D'AFFICHAGE ---
 if not st.session_state.db.empty:
     with t1:
-        st.dataframe(st.session_state.db[['ID', 'Date', 'Statut', 'Heure', 'Agent', 'Batiment', 'Type']].sort_values(['Date_Sort', 'Heure']), use_container_width=True)
+        # On force l'ordre d'affichage par Date, puis Heure
+        df_display = st.session_state.db.sort_values(['Date_Sort', 'Heure'])
+        st.dataframe(df_display[['ID', 'Date', 'Statut', 'Heure', 'Agent', 'Batiment', 'Type']], use_container_width=True)
+        
+        # Bouton de téléchargement
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            df_display.drop(columns=['Date_Sort']).to_excel(writer, index=False)
+        st.download_button("📥 Télécharger le Planning Excel", output.getvalue(), "Planning_Unite_Logement.xlsx")
     
     with t2:
         dates_j = sorted(st.session_state.db['Date'].unique(), key=lambda x: datetime.strptime(x, '%d/%m/%Y'))
-        sel_j = st.selectbox("📅 Date :", dates_j)
+        sel_j = st.selectbox("📅 Sélectionner une date :", dates_j)
         cols = st.columns(len(AGENTS))
         for i, a in enumerate(AGENTS):
             with cols[i]:
@@ -160,15 +165,18 @@ if not st.session_state.db.empty:
                     st.markdown(f"<div style='background-color:{COULEURS[a]}; padding:8px; border-radius:5px; border:1px solid #ccc; color:black; margin-top:5px;'>🆔 <b>{r['ID']}</b><br>🕒 <b>{r['Heure']}</b><br>🏠 {r['Batiment']}</div>", unsafe_allow_html=True)
 
     with t3:
+        # RESTAURATION DES RAPPORTS
         df_rep = st.session_state.db.copy()
         df_rep['Mois'] = df_rep['Date_Sort'].dt.strftime('%B %Y')
         col_f1, col_f2 = st.columns(2)
-        mois_sel = col_f1.selectbox("📅 Mois :", df_rep['Mois'].unique())
-        agents_sel = col_f2.multiselect("👤 Agents :", AGENTS, default=AGENTS)
+        mois_dispos = df_rep['Mois'].unique()
+        mois_sel = col_f1.selectbox("📅 Choisir le Mois :", mois_dispos)
+        agents_sel = col_f2.multiselect("👤 Filtrer les Agents :", AGENTS, default=AGENTS)
+        
         df_f = df_rep[(df_rep['Mois'] == mois_sel) & (df_rep['Agent'].isin(agents_sel))]
 
         if not df_f.empty:
-            # Calcul KM
+            # Calcul KM (Logique restaurée)
             total_km = 0.0
             for agent in agents_sel:
                 df_agt = df_f[df_f['Agent'] == agent].sort_values(['Date_Sort', 'Heure'])
@@ -181,15 +189,25 @@ if not st.session_state.db.empty:
                         prev = curr
                     total_km += calculer_distance(prev, BUREAU_GPS)
 
-            st.markdown("### 📊 Indicateurs")
+            st.markdown("### 📊 Statistiques du mois")
             c1, c2, c3 = st.columns(3)
-            c1.metric("Missions", len(df_f))
-            c2.metric("Distance Est.", f"{total_km:.1f} km")
-            c3.metric("Jours Actifs", df_f['Date'].nunique())
+            c1.metric("Total Missions", len(df_f))
+            c2.metric("Distance Totale (est.)", f"{total_km:.1f} km")
+            c3.metric("Jours d'activité", df_f['Date'].nunique())
 
-            fig = px.histogram(df_f, x='Date', color='Agent', barmode='group', color_discrete_map=COULEURS, title="Volume par jour")
+            # Graphique Plotly restauré
+            fig = px.histogram(df_f, x='Date', color='Agent', barmode='group', 
+                               color_discrete_map=COULEURS, title="Volume de missions par jour")
             st.plotly_chart(fig, use_container_width=True)
+            
+            # Répartition par bâtiment
+            st.subheader("🏠 Volume par bâtiment")
+            df_bat = df_f.groupby('Batiment').size().reset_index(name='Nombre de missions')
+            st.table(df_bat.sort_values('Nombre de missions', ascending=False))
+        else:
+            st.warning("Aucune donnée pour cette sélection d'agents ou ce mois.")
 else:
-    st.info("Importez un fichier Excel pour activer les rapports.")
+    st.info("👋 Bienvenue ! Veuillez importer un fichier Excel dans la barre latérale pour commencer.")
 
-st.caption(f"v4.3 | Répartition par Bâtiment & Rapports Restaurés | {datetime.now().year}")
+st.divider()
+st.caption(f"v4.4 | Optimisation Bâtiments & Rapports Complets | {datetime.now().year}")
