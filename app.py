@@ -118,8 +118,7 @@ with st.sidebar:
 
                         temp_rows.append({
                             'ID': row[c_id], 'Batiment': bat_nom, 'Date': ds, 'Heure': h_fin, 
-                            'Agent': agt_elu, 'Type': row[c_type] if c_type in row else "Mission", 
-                            'Rue': INFOS_BATIMENTS.get(bat_nom, {}).get('rue', ''), 
+                            'Agent': agt_elu, 'Type': str(row[c_type]), 'Rue': INFOS_BATIMENTS.get(bat_nom, {}).get('rue', ''), 
                             'Statut': bloc, 'Date_Sort': jour
                         })
 
@@ -139,23 +138,13 @@ if not st.session_state.db.empty:
         
         st.divider()
         st.subheader("📥 Exportation")
-        
-        # Format visuel par colonnes
         df_pivot = df_v.copy()
         df_pivot['Contenu'] = df_pivot['Batiment'] + " (ID:" + df_pivot['ID'].astype(str) + ")"
         df_visual = df_pivot.pivot_table(index=['Date', 'Heure'], columns='Agent', values='Contenu', aggfunc='first').reset_index().fillna('')
         
-        col_dl1, col_dl2 = st.columns(2)
-        
-        # Download 1: Liste classique
-        output_std = io.BytesIO()
-        df_v.drop(columns=['Date_Sort']).to_excel(output_std, index=False)
-        col_dl1.download_button("📄 Télécharger Liste Standard", output_std.getvalue(), "Planning_Liste.xlsx")
-        
-        # Download 2: Version visuelle (SANS COULEURS dans le Excel)
         output_vis = io.BytesIO()
         df_visual.to_excel(output_vis, index=False)
-        col_dl2.download_button("✨ Télécharger Version par Agent", output_vis.getvalue(), "Planning_Equipe.xlsx", type="primary")
+        st.download_button("✨ Télécharger Version par Agent", output_vis.getvalue(), "Planning_Equipe.xlsx", type="primary")
 
     with t2:
         dates_j = sorted(st.session_state.db['Date'].unique(), key=lambda x: datetime.strptime(x, '%d/%m/%Y'))
@@ -169,56 +158,73 @@ if not st.session_state.db.empty:
                     st.markdown(f"<div style='background-color:{COULEURS[a]}; padding:8px; border-radius:5px; border:1px solid #ccc; color:black; margin-top:5px;'>🆔 <b>{r['ID']}</b><br>🕒 <b>{r['Heure']}</b><br>🏠 {r['Batiment']}</div>", unsafe_allow_html=True)
 
     with t3:
+        # --- RÉPARATION DES RAPPORTS ---
         df_rep = st.session_state.db.copy()
+        df_rep['Date_Sort'] = pd.to_datetime(df_rep['Date_Sort'])
         df_rep['Mois'] = df_rep['Date_Sort'].dt.strftime('%B %Y')
+        
         col_f1, col_f2 = st.columns(2)
-        mois_sel = col_f1.selectbox("📅 Mois :", df_rep['Mois'].unique())
+        mois_dispos = df_rep['Mois'].unique()
+        mois_sel = col_f1.selectbox("📅 Mois :", mois_dispos)
         agents_sel = col_f2.multiselect("👤 Agents :", AGENTS, default=AGENTS)
-        df_f = df_rep[(df_rep['Mois'] == mois_sel) & (df_rep['Agent'].isin(agents_sel))]
+        
+        df_f = df_rep[(df_rep['Mois'] == mois_sel) & (df_rep['Agent'].isin(agents_sel))].copy()
 
         if not df_f.empty:
             total_km, groupes_bat, groupes_sec = 0.0, 0, 0
-            total_missions = len(df_f)
             
             for agent in agents_sel:
                 df_agt = df_f[df_f['Agent'] == agent].sort_values(['Date_Sort', 'Heure'])
-                for jour in df_agt['Date'].unique():
-                    m_j = df_agt[df_agt['Date'] == jour]
-                    prev_coords, prev_bat, prev_sec = BUREAU_GPS, None, None
+                for jour_str in df_agt['Date'].unique():
+                    m_j = df_agt[df_agt['Date'] == jour_str]
+                    prev_coords = BUREAU_GPS
+                    prev_bat, prev_sec = None, None
+                    
                     for i, (_, row) in enumerate(m_j.iterrows()):
                         curr_b = row['Batiment']
                         curr_sec = trouver_secteur(curr_b)
+                        # Coordonnées du bâtiment ou bureau si inconnu
                         coords = (INFOS_BATIMENTS[curr_b]['lat'], INFOS_BATIMENTS[curr_b]['lon']) if curr_b in INFOS_BATIMENTS else BUREAU_GPS
+                        
                         total_km += calculer_distance(prev_coords, coords)
+                        
                         if i > 0:
                             if curr_b == prev_bat: groupes_bat += 1
                             elif curr_sec == prev_sec: groupes_sec += 1
+                        
                         prev_coords, prev_bat, prev_sec = coords, curr_b, curr_sec
+                    
+                    # Retour au bureau en fin de journée
                     total_km += calculer_distance(prev_coords, BUREAU_GPS)
 
+            total_missions = len(df_f)
             st.markdown("### 📊 Indicateurs Clés")
             r1, r2, r3, r4 = st.columns(4)
             r1.metric("Total Missions", total_missions)
             r2.metric("🚗 Distance Est.", f"{total_km:.1f} km")
-            r3.metric("🏢 Opti. Bâtiment", f"{(groupes_bat/total_missions*100):.1f}%")
-            r4.metric("📍 Opti. Secteur", f"{(groupes_sec/total_missions*100):.1f}%")
+            r3.metric("🏢 Opti. Bâtiment", f"{(groupes_bat/total_missions*100):.1f}%" if total_missions > 0 else "0%")
+            r4.metric("📍 Opti. Secteur", f"{(groupes_sec/total_missions*100):.1f}%" if total_missions > 0 else "0%")
             
             nb_entrees = df_f[df_f['Type'].str.contains('Entrée|In', case=False)].shape[0]
             nb_sorties = df_f[df_f['Type'].str.contains('Sortie|Out', case=False)].shape[0]
-            st.columns(4)[0].metric("📈 Entrées", nb_entrees)
-            st.columns(4)[1].metric("📉 Sorties", nb_sorties)
+            
+            c1, c2 = st.columns(2)
+            c1.metric("📈 Entrées", nb_entrees)
+            c2.metric("📉 Sorties", nb_sorties)
 
-            st.plotly_chart(px.histogram(df_f, x='Date', color='Agent', barmode='group', color_discrete_map=COULEURS), use_container_width=True)
+            st.plotly_chart(px.histogram(df_f, x='Date', color='Agent', barmode='group', color_discrete_map=COULEURS, title="Missions par jour"), use_container_width=True)
             
             cl, cr = st.columns(2)
             with cl:
-                st.subheader("🏠 Par bâtiment")
+                st.subheader("🏠 Volume par bâtiment")
                 st.table(df_f.groupby('Batiment').size().reset_index(name='Missions').sort_values('Missions', ascending=False))
             with cr:
                 st.subheader("📍 Carte")
                 map_data = [{'lat': INFOS_BATIMENTS[b]['lat'], 'lon': INFOS_BATIMENTS[b]['lon'], 'Missions': c} 
                             for b, c in df_f.groupby('Batiment').size().items() if b in INFOS_BATIMENTS]
                 if map_data: st.map(pd.DataFrame(map_data), size="Missions")
+        else:
+            st.warning("Pas de données pour cette sélection.")
 else:
     st.info("Importez un fichier Excel pour commencer.")
 
