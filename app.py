@@ -135,33 +135,29 @@ if not st.session_state.db.empty:
         def style_agent(row):
             color = COULEURS.get(row['Agent'], "#ffffff")
             return [f'background-color: {color}; color: black'] * len(row)
-        
-        st.subheader("📋 Liste complète")
         st.dataframe(df_v[['ID', 'Date', 'Statut', 'Heure', 'Agent', 'Batiment', 'Type']].style.apply(style_agent, axis=1), use_container_width=True)
         
-        # --- LOGIQUE TÉLÉCHARGEMENT VERSION PAR AGENT (VISUELLE) ---
         st.divider()
-        st.subheader("📥 Exportation Spéciale")
+        st.subheader("📥 Exportation Stylée")
         
-        # On prépare un Excel où chaque agent a sa colonne
+        # Préparation du format visuel par colonnes
         df_pivot = df_v.copy()
-        df_pivot['Contenu'] = "ID: " + df_pivot['ID'].astype(str) + " - " + df_pivot['Batiment']
+        df_pivot['Contenu'] = df_pivot['Batiment'] + " (ID:" + df_pivot['ID'].astype(str) + ")"
         df_visual = df_pivot.pivot_table(index=['Date', 'Heure'], columns='Agent', values='Contenu', aggfunc='first').reset_index().fillna('')
         
-        col_dl1, col_dl2 = st.columns(2)
-        
-        # Bouton 1 : Liste classique
-        output_std = io.BytesIO()
-        with pd.ExcelWriter(output_std, engine='xlsxwriter') as writer:
-            df_v.drop(columns=['Date_Sort']).to_excel(writer, index=False)
-        col_dl1.download_button("📄 Télécharger Liste Standard", output_std.getvalue(), "Planning_Liste.xlsx")
-        
-        # Bouton 2 : Version par Agent (Celle que vous trouvez stylée)
-        output_vis = io.BytesIO()
-        with pd.ExcelWriter(output_vis, engine='xlsxwriter') as writer:
-            df_visual.to_excel(writer, index=False)
-            # Optionnel : On peut ajouter un peu de formatage ici si besoin
-        col_dl2.download_button("✨ Télécharger Version par Agent (Stylée)", output_vis.getvalue(), "Planning_Visuel_Agents.xlsx", type="primary")
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            df_visual.to_excel(writer, index=False, sheet_name='Planning')
+            workbook  = writer.book
+            worksheet = writer.sheets['Planning']
+            
+            # Formatage des couleurs dans Excel
+            for i, agent in enumerate(df_visual.columns):
+                if agent in COULEURS:
+                    fmt = workbook.add_format({'bg_color': COULEURS[agent], 'border': 1})
+                    worksheet.set_column(i, i, 25, fmt)
+            
+        st.download_button("✨ Télécharger le Planning Visuel Coloré", output.getvalue(), "Planning_Equipe.xlsx", type="primary")
 
     with t2:
         dates_j = sorted(st.session_state.db['Date'].unique(), key=lambda x: datetime.strptime(x, '%d/%m/%Y'))
@@ -175,7 +171,7 @@ if not st.session_state.db.empty:
                     st.markdown(f"<div style='background-color:{COULEURS[a]}; padding:8px; border-radius:5px; border:1px solid #ccc; color:black; margin-top:5px;'>🆔 <b>{r['ID']}</b><br>🕒 <b>{r['Heure']}</b><br>🏠 {r['Batiment']}</div>", unsafe_allow_html=True)
 
     with t3:
-        # (Le code des rapports reste identique à la version précédente)
+        # --- RESTAURATION TOTALE DES RAPPORTS D'ORIGINE ---
         df_rep = st.session_state.db.copy()
         df_rep['Mois'] = df_rep['Date_Sort'].dt.strftime('%B %Y')
         col_f1, col_f2 = st.columns(2)
@@ -184,34 +180,51 @@ if not st.session_state.db.empty:
         df_f = df_rep[(df_rep['Mois'] == mois_sel) & (df_rep['Agent'].isin(agents_sel))]
 
         if not df_f.empty:
-            total_km = 0.0
+            total_km, groupes_bat, groupes_sec = 0.0, 0, 0
             total_missions = len(df_f)
+            
             for agent in agents_sel:
                 df_agt = df_f[df_f['Agent'] == agent].sort_values(['Date_Sort', 'Heure'])
                 for jour in df_agt['Date'].unique():
                     m_j = df_agt[df_agt['Date'] == jour]
-                    prev = BUREAU_GPS
-                    for _, row in m_j.iterrows():
-                        curr = (INFOS_BATIMENTS[row['Batiment']]['lat'], INFOS_BATIMENTS[row['Batiment']]['lon']) if row['Batiment'] in INFOS_BATIMENTS else BUREAU_GPS
-                        total_km += calculer_distance(prev, curr)
-                        prev = curr
-                    total_km += calculer_distance(prev, BUREAU_GPS)
+                    prev_coords, prev_bat, prev_sec = BUREAU_GPS, None, None
+                    for i, (_, row) in enumerate(m_j.iterrows()):
+                        curr_b = row['Batiment']
+                        curr_sec = trouver_secteur(curr_b)
+                        coords = (INFOS_BATIMENTS[curr_b]['lat'], INFOS_BATIMENTS[curr_b]['lon']) if curr_b in INFOS_BATIMENTS else BUREAU_GPS
+                        total_km += calculer_distance(prev_coords, coords)
+                        if i > 0:
+                            if curr_b == prev_bat: groupes_bat += 1
+                            elif curr_sec == prev_sec: groupes_sec += 1
+                        prev_coords, prev_bat, prev_sec = coords, curr_b, curr_sec
+                    total_km += calculer_distance(prev_coords, BUREAU_GPS)
 
-            st.markdown("### 📊 Statistiques")
-            c1, c2, c3 = st.columns(3)
-            c1.metric("Missions", total_missions)
-            c2.metric("Distance Est.", f"{total_km:.1f} km")
-            c3.metric("Jours Actifs", df_f['Date'].nunique())
-
-            fig = px.histogram(df_f, x='Date', color='Agent', barmode='group', color_discrete_map=COULEURS)
-            st.plotly_chart(fig, use_container_width=True)
+            st.markdown("### 📊 Indicateurs Clés")
+            r1, r2, r3, r4 = st.columns(4)
+            r1.metric("Total Missions", total_missions)
+            r2.metric("🚗 Distance Est.", f"{total_km:.1f} km")
+            r3.metric("🏢 Opti. Bâtiment", f"{(groupes_bat/total_missions*100):.1f}%")
+            r4.metric("📍 Opti. Secteur", f"{(groupes_sec/total_missions*100):.1f}%")
             
-            st.subheader("🏠 Volume par bâtiment")
-            df_bat = df_f.groupby('Batiment').size().reset_index(name='Missions')
-            st.table(df_bat.sort_values('Missions', ascending=False))
+            nb_entrees = df_f[df_f['Type'].str.contains('Entrée|In', case=False)].shape[0]
+            nb_sorties = df_f[df_f['Type'].str.contains('Sortie|Out', case=False)].shape[0]
+            st.columns(4)[0].metric("📈 Entrées", nb_entrees)
+            st.columns(4)[1].metric("📉 Sorties", nb_sorties)
+
+            st.plotly_chart(px.histogram(df_f, x='Date', color='Agent', barmode='group', color_discrete_map=COULEURS), use_container_width=True)
+            
+            cl, cr = st.columns(2)
+            with cl:
+                st.subheader("🏠 Par bâtiment")
+                st.table(df_f.groupby('Batiment').size().reset_index(name='Missions').sort_values('Missions', ascending=False))
+            with cr:
+                st.subheader("📍 Carte")
+                map_data = [{'lat': INFOS_BATIMENTS[b]['lat'], 'lon': INFOS_BATIMENTS[b]['lon'], 'Missions': c} 
+                            for b, c in df_f.groupby('Batiment').size().items() if b in INFOS_BATIMENTS]
+                if map_data: st.map(pd.DataFrame(map_data), size="Missions")
 else:
     st.info("Importez un fichier Excel pour commencer.")
 
-if st.sidebar.button("🗑️ Reset Complet"):
+if st.sidebar.button("🗑️ Reset"):
     st.session_state.db = pd.DataFrame(columns=['ID', 'Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Type', 'Statut', 'Date_Sort'])
     st.rerun()
