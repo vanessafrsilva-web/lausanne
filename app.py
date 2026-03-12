@@ -31,6 +31,11 @@ COULEURS = {"Celine": "#d1e9ff", "Maria Claret": "#ffdae0", "Maria Elisabeth": "
 st.set_page_config(page_title="Unité Logement - Gestion Planning", layout="wide", page_icon="📍")
 
 # --- FONCTIONS TECHNIQUES ---
+def trouver_secteur(batiment):
+    for secteur, liste in SECTEURS.items():
+        if batiment in liste: return secteur
+    return batiment 
+
 def calculer_distance(pos1, pos2):
     if not pos1 or not pos2: return 0
     R = 6371.0
@@ -91,7 +96,7 @@ with st.sidebar:
                 ds = pd.to_datetime(jour).strftime('%d/%m/%Y')
                 df_j = df_ex[df_ex[c_date] == jour].copy()
                 
-                # Tri par bâtiment pour les grouper
+                # Groupement par bâtiment pour logique 90 -> 92
                 for bat_nom in df_j[c_bat].unique():
                     df_b = df_j[df_j[c_bat] == bat_nom]
                     idx_agt = 0
@@ -124,31 +129,14 @@ with st.sidebar:
         except Exception as e:
             st.error(f"Erreur : {e}")
 
-    if not st.session_state.db.empty:
-        st.divider()
-        if st.button("🗑️ Reset"):
-            st.session_state.db = pd.DataFrame(columns=['ID', 'Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Type', 'Statut', 'Date_Sort'])
-            st.rerun()
-
 # --- AFFICHAGE ---
 if not st.session_state.db.empty:
     with t1:
         df_v = st.session_state.db.sort_values(['Date_Sort', 'Heure'])
-        
-        # Fonction pour appliquer les couleurs par ligne
         def style_agent(row):
             color = COULEURS.get(row['Agent'], "#ffffff")
             return [f'background-color: {color}; color: black'] * len(row)
-
-        st.dataframe(
-            df_v[['ID', 'Date', 'Statut', 'Heure', 'Agent', 'Batiment', 'Type']].style.apply(style_agent, axis=1),
-            use_container_width=True, height=500
-        )
-        
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            df_v.drop(columns=['Date_Sort']).to_excel(writer, index=False)
-        st.download_button("📥 Télécharger Excel", output.getvalue(), "Planning.xlsx")
+        st.dataframe(df_v[['ID', 'Date', 'Statut', 'Heure', 'Agent', 'Batiment', 'Type']].style.apply(style_agent, axis=1), use_container_width=True)
     
     with t2:
         dates_j = sorted(st.session_state.db['Date'].unique(), key=lambda x: datetime.strptime(x, '%d/%m/%Y'))
@@ -170,25 +158,66 @@ if not st.session_state.db.empty:
         df_f = df_rep[(df_rep['Mois'] == mois_sel) & (df_rep['Agent'].isin(agents_sel))]
 
         if not df_f.empty:
+            # 1. CALCULS RAPPORTS COMPLETS
             total_km = 0.0
+            groupes_bat = 0
+            groupes_sec = 0
+            total_missions = len(df_f)
+            
             for agent in agents_sel:
                 df_agt = df_f[df_f['Agent'] == agent].sort_values(['Date_Sort', 'Heure'])
                 for jour in df_agt['Date'].unique():
-                    m_j = df_agt[df_agt['Date'] == jour]
-                    prev = BUREAU_GPS
-                    for _, row in m_j.iterrows():
-                        curr = (INFOS_BATIMENTS[row['Batiment']]['lat'], INFOS_BATIMENTS[row['Batiment']]['lon']) if row['Batiment'] in INFOS_BATIMENTS else BUREAU_GPS
-                        total_km += calculer_distance(prev, curr)
-                        prev = curr
-                    total_km += calculer_distance(prev, BUREAU_GPS)
+                    missions_j = df_agt[df_agt['Date'] == jour]
+                    prev_coords = BUREAU_GPS
+                    prev_bat = None
+                    prev_sec = None
+                    for i, (_, row) in enumerate(missions_j.iterrows()):
+                        curr_b = row['Batiment']
+                        curr_sec = trouver_secteur(curr_b)
+                        coords = (INFOS_BATIMENTS[curr_b]['lat'], INFOS_BATIMENTS[curr_b]['lon']) if curr_b in INFOS_BATIMENTS else BUREAU_GPS
+                        total_km += calculer_distance(prev_coords, coords)
+                        if i > 0:
+                            if curr_b == prev_bat: groupes_bat += 1
+                            elif curr_sec == prev_sec: groupes_sec += 1
+                        prev_coords, prev_bat, prev_sec = coords, curr_b, curr_sec
+                    total_km += calculer_distance(prev_coords, BUREAU_GPS)
 
-            st.markdown("### 📊 Statistiques")
-            c1, c2, c3 = st.columns(3)
-            c1.metric("Missions", len(df_f))
-            c2.metric("Distance Est.", f"{total_km:.1f} km")
-            c3.metric("Jours Actifs", df_f['Date'].nunique())
+            # 2. INDICATEURS CLÉS
+            st.markdown("### 📊 Indicateurs de Performance")
+            r1, r2, r3, r4 = st.columns(4)
+            r1.metric("Total Missions", total_missions)
+            r2.metric("🚗 Distance Est.", f"{total_km:.1f} km")
+            r3.metric("🏢 Opti. Bâtiment", f"{(groupes_bat/total_missions*100):.1f}%")
+            r4.metric("📍 Opti. Secteur", f"{(groupes_sec/total_missions*100):.1f}%")
+            
+            nb_entrees = df_f[df_f['Type'].str.contains('Entrée|In', case=False)].shape[0]
+            nb_sorties = df_f[df_f['Type'].str.contains('Sortie|Out', case=False)].shape[0]
+            r1b, r2b, r3b, r4b = st.columns(4)
+            r1b.metric("📈 Entrées", nb_entrees)
+            r2b.metric("📉 Sorties", nb_sorties)
+            r3b.metric("👥 Agents actifs", len(agents_sel))
+            r4b.metric("📅 Jours", df_f['Date'].nunique())
 
-            fig = px.histogram(df_f, x='Date', color='Agent', barmode='group', color_discrete_map=COULEURS)
+            st.divider()
+            # 3. GRAPHIQUE HISTOGRAMME
+            fig = px.histogram(df_f, x='Date', color='Agent', barmode='group', color_discrete_map=COULEURS, title="Charge de travail journalière")
             st.plotly_chart(fig, use_container_width=True)
+
+            st.divider()
+            cl, cr = st.columns(2)
+            with cl:
+                st.subheader("🏠 Volume par bâtiment")
+                df_bat = df_f.groupby('Batiment').size().reset_index(name='Missions').sort_values('Missions', ascending=False)
+                st.table(df_bat)
+            with cr:
+                st.subheader("📍 Carte des interventions")
+                map_data = [{'lat': INFOS_BATIMENTS[b]['lat'], 'lon': INFOS_BATIMENTS[b]['lon'], 'Missions': count} 
+                            for b, count in df_f.groupby('Batiment').size().items() if b in INFOS_BATIMENTS]
+                if map_data:
+                    st.map(pd.DataFrame(map_data), size="Missions")
 else:
-    st.info("Importez un fichier Excel pour commencer.")
+    st.info("Importez un fichier Excel pour activer les rapports.")
+
+if st.sidebar.button("🗑️ Reset Complet"):
+    st.session_state.db = pd.DataFrame(columns=['ID', 'Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Type', 'Statut', 'Date_Sort'])
+    st.rerun()
