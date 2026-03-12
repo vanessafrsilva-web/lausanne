@@ -158,7 +158,6 @@ if not st.session_state.db.empty:
                     st.markdown(f"<div style='background-color:{COULEURS[a]}; padding:8px; border-radius:5px; border:1px solid #ccc; color:black; margin-top:5px;'>🆔 <b>{r['ID']}</b><br>🕒 <b>{r['Heure']}</b><br>🏠 {r['Batiment']}</div>", unsafe_allow_html=True)
 
     with t3:
-        # --- RÉPARATION DES RAPPORTS ---
         df_rep = st.session_state.db.copy()
         df_rep['Date_Sort'] = pd.to_datetime(df_rep['Date_Sort'])
         df_rep['Mois'] = df_rep['Date_Sort'].dt.strftime('%B %Y')
@@ -171,47 +170,29 @@ if not st.session_state.db.empty:
         df_f = df_rep[(df_rep['Mois'] == mois_sel) & (df_rep['Agent'].isin(agents_sel))].copy()
 
         if not df_f.empty:
-            total_km, groupes_bat, groupes_sec = 0.0, 0, 0
-            
+            total_km = 0.0
             for agent in agents_sel:
                 df_agt = df_f[df_f['Agent'] == agent].sort_values(['Date_Sort', 'Heure'])
                 for jour_str in df_agt['Date'].unique():
                     m_j = df_agt[df_agt['Date'] == jour_str]
                     prev_coords = BUREAU_GPS
-                    prev_bat, prev_sec = None, None
-                    
-                    for i, (_, row) in enumerate(m_j.iterrows()):
-                        curr_b = row['Batiment']
-                        curr_sec = trouver_secteur(curr_b)
-                        # Coordonnées du bâtiment ou bureau si inconnu
-                        coords = (INFOS_BATIMENTS[curr_b]['lat'], INFOS_BATIMENTS[curr_b]['lon']) if curr_b in INFOS_BATIMENTS else BUREAU_GPS
-                        
+                    for _, row in m_j.iterrows():
+                        coords = (INFOS_BATIMENTS[row['Batiment']]['lat'], INFOS_BATIMENTS[row['Batiment']]['lon']) if row['Batiment'] in INFOS_BATIMENTS else BUREAU_GPS
                         total_km += calculer_distance(prev_coords, coords)
-                        
-                        if i > 0:
-                            if curr_b == prev_bat: groupes_bat += 1
-                            elif curr_sec == prev_sec: groupes_sec += 1
-                        
-                        prev_coords, prev_bat, prev_sec = coords, curr_b, curr_sec
-                    
-                    # Retour au bureau en fin de journée
+                        prev_coords = coords
                     total_km += calculer_distance(prev_coords, BUREAU_GPS)
 
-            total_missions = len(df_f)
             st.markdown("### 📊 Indicateurs Clés")
-            r1, r2, r3, r4 = st.columns(4)
-            r1.metric("Total Missions", total_missions)
-            r2.metric("🚗 Distance Est.", f"{total_km:.1f} km")
-            r3.metric("🏢 Opti. Bâtiment", f"{(groupes_bat/total_missions*100):.1f}%" if total_missions > 0 else "0%")
-            r4.metric("📍 Opti. Secteur", f"{(groupes_sec/total_missions*100):.1f}%" if total_missions > 0 else "0%")
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("Total Missions", len(df_f))
+            c2.metric("🚗 Distance Est.", f"{total_km:.1f} km")
             
             nb_entrees = df_f[df_f['Type'].str.contains('Entrée|In', case=False)].shape[0]
             nb_sorties = df_f[df_f['Type'].str.contains('Sortie|Out', case=False)].shape[0]
-            
-            c1, c2 = st.columns(2)
-            c1.metric("📈 Entrées", nb_entrees)
-            c2.metric("📉 Sorties", nb_sorties)
+            c3.metric("📈 Entrées", nb_entrees)
+            c4.metric("📉 Sorties", nb_sorties)
 
+            st.divider()
             st.plotly_chart(px.histogram(df_f, x='Date', color='Agent', barmode='group', color_discrete_map=COULEURS, title="Missions par jour"), use_container_width=True)
             
             cl, cr = st.columns(2)
