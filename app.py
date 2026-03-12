@@ -142,9 +142,14 @@ if not st.session_state.db.empty:
         df_pivot['Contenu'] = df_pivot['Batiment'] + " (ID:" + df_pivot['ID'].astype(str) + ")"
         df_visual = df_pivot.pivot_table(index=['Date', 'Heure'], columns='Agent', values='Contenu', aggfunc='first').reset_index().fillna('')
         
+        col_dl1, col_dl2 = st.columns(2)
+        output_std = io.BytesIO()
+        df_v.drop(columns=['Date_Sort']).to_excel(output_std, index=False)
+        col_dl1.download_button("📄 Télécharger Liste Standard", output_std.getvalue(), "Planning_Liste.xlsx")
+        
         output_vis = io.BytesIO()
         df_visual.to_excel(output_vis, index=False)
-        st.download_button("✨ Télécharger Version par Agent", output_vis.getvalue(), "Planning_Equipe.xlsx", type="primary")
+        col_dl2.download_button("✨ Télécharger Version par Agent", output_vis.getvalue(), "Planning_Equipe.xlsx", type="primary")
 
     with t2:
         dates_j = sorted(st.session_state.db['Date'].unique(), key=lambda x: datetime.strptime(x, '%d/%m/%Y'))
@@ -163,37 +168,39 @@ if not st.session_state.db.empty:
         df_rep['Mois'] = df_rep['Date_Sort'].dt.strftime('%B %Y')
         
         col_f1, col_f2 = st.columns(2)
-        mois_dispos = df_rep['Mois'].unique()
-        mois_sel = col_f1.selectbox("📅 Mois :", mois_dispos)
+        mois_sel = col_f1.selectbox("📅 Mois :", df_rep['Mois'].unique())
         agents_sel = col_f2.multiselect("👤 Agents :", AGENTS, default=AGENTS)
-        
         df_f = df_rep[(df_rep['Mois'] == mois_sel) & (df_rep['Agent'].isin(agents_sel))].copy()
 
         if not df_f.empty:
             total_km = 0.0
             for agent in agents_sel:
                 df_agt = df_f[df_f['Agent'] == agent].sort_values(['Date_Sort', 'Heure'])
-                for jour_str in df_agt['Date'].unique():
-                    m_j = df_agt[df_agt['Date'] == jour_str]
-                    prev_coords = BUREAU_GPS
+                for jour_dt in df_agt['Date_Sort'].unique():
+                    m_j = df_agt[df_agt['Date_Sort'] == jour_dt]
+                    point_actuel = BUREAU_GPS
                     for _, row in m_j.iterrows():
-                        coords = (INFOS_BATIMENTS[row['Batiment']]['lat'], INFOS_BATIMENTS[row['Batiment']]['lon']) if row['Batiment'] in INFOS_BATIMENTS else BUREAU_GPS
-                        total_km += calculer_distance(prev_coords, coords)
-                        prev_coords = coords
-                    total_km += calculer_distance(prev_coords, BUREAU_GPS)
+                        nom_b = str(row['Batiment']).strip()
+                        # Recherche coordonnée insensible à la casse
+                        coords = next((v for k, v in INFOS_BATIMENTS.items() if k.lower() == nom_b.lower()), None)
+                        if coords:
+                            dest = (coords['lat'], coords['lon'])
+                            total_km += calculer_distance(point_actuel, dest)
+                            point_actuel = dest
+                    total_km += calculer_distance(point_actuel, BUREAU_GPS)
 
             st.markdown("### 📊 Indicateurs Clés")
             c1, c2, c3, c4 = st.columns(4)
             c1.metric("Total Missions", len(df_f))
             c2.metric("🚗 Distance Est.", f"{total_km:.1f} km")
             
-            nb_entrees = df_f[df_f['Type'].str.contains('Entrée|In', case=False)].shape[0]
-            nb_sorties = df_f[df_f['Type'].str.contains('Sortie|Out', case=False)].shape[0]
+            nb_entrees = df_f[df_f['Type'].str.contains('Entrée|In', case=False, na=False)].shape[0]
+            nb_sorties = df_f[df_f['Type'].str.contains('Sortie|Out', case=False, na=False)].shape[0]
             c3.metric("📈 Entrées", nb_entrees)
             c4.metric("📉 Sorties", nb_sorties)
 
             st.divider()
-            st.plotly_chart(px.histogram(df_f, x='Date', color='Agent', barmode='group', color_discrete_map=COULEURS, title="Missions par jour"), use_container_width=True)
+            st.plotly_chart(px.histogram(df_f, x='Date', color='Agent', barmode='group', color_discrete_map=COULEURS), use_container_width=True)
             
             cl, cr = st.columns(2)
             with cl:
@@ -206,9 +213,9 @@ if not st.session_state.db.empty:
                 if map_data: st.map(pd.DataFrame(map_data), size="Missions")
         else:
             st.warning("Pas de données pour cette sélection.")
-else:
-    st.info("Importez un fichier Excel pour commencer.")
 
 if st.sidebar.button("🗑️ Reset"):
     st.session_state.db = pd.DataFrame(columns=['ID', 'Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Type', 'Statut', 'Date_Sort'])
     st.rerun()
+
+st.caption(f"v4.5 | {datetime.now().year}")
