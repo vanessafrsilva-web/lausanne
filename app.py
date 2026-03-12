@@ -138,26 +138,24 @@ if not st.session_state.db.empty:
         st.dataframe(df_v[['ID', 'Date', 'Statut', 'Heure', 'Agent', 'Batiment', 'Type']].style.apply(style_agent, axis=1), use_container_width=True)
         
         st.divider()
-        st.subheader("📥 Exportation Stylée")
+        st.subheader("📥 Exportation")
         
-        # Préparation du format visuel par colonnes
+        # Format visuel par colonnes
         df_pivot = df_v.copy()
         df_pivot['Contenu'] = df_pivot['Batiment'] + " (ID:" + df_pivot['ID'].astype(str) + ")"
         df_visual = df_pivot.pivot_table(index=['Date', 'Heure'], columns='Agent', values='Contenu', aggfunc='first').reset_index().fillna('')
         
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            df_visual.to_excel(writer, index=False, sheet_name='Planning')
-            workbook  = writer.book
-            worksheet = writer.sheets['Planning']
-            
-            # Formatage des couleurs dans Excel
-            for i, agent in enumerate(df_visual.columns):
-                if agent in COULEURS:
-                    fmt = workbook.add_format({'bg_color': COULEURS[agent], 'border': 1})
-                    worksheet.set_column(i, i, 25, fmt)
-            
-        st.download_button("✨ Télécharger le Planning Visuel Coloré", output.getvalue(), "Planning_Equipe.xlsx", type="primary")
+        col_dl1, col_dl2 = st.columns(2)
+        
+        # Download 1: Liste classique
+        output_std = io.BytesIO()
+        df_v.drop(columns=['Date_Sort']).to_excel(output_std, index=False)
+        col_dl1.download_button("📄 Télécharger Liste Standard", output_std.getvalue(), "Planning_Liste.xlsx")
+        
+        # Download 2: Version visuelle (SANS COULEURS dans le Excel)
+        output_vis = io.BytesIO()
+        df_visual.to_excel(output_vis, index=False)
+        col_dl2.download_button("✨ Télécharger Version par Agent", output_vis.getvalue(), "Planning_Equipe.xlsx", type="primary")
 
     with t2:
         dates_j = sorted(st.session_state.db['Date'].unique(), key=lambda x: datetime.strptime(x, '%d/%m/%Y'))
@@ -171,7 +169,6 @@ if not st.session_state.db.empty:
                     st.markdown(f"<div style='background-color:{COULEURS[a]}; padding:8px; border-radius:5px; border:1px solid #ccc; color:black; margin-top:5px;'>🆔 <b>{r['ID']}</b><br>🕒 <b>{r['Heure']}</b><br>🏠 {r['Batiment']}</div>", unsafe_allow_html=True)
 
     with t3:
-        # --- RESTAURATION TOTALE DES RAPPORTS D'ORIGINE ---
         df_rep = st.session_state.db.copy()
         df_rep['Mois'] = df_rep['Date_Sort'].dt.strftime('%B %Y')
         col_f1, col_f2 = st.columns(2)
