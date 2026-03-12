@@ -34,6 +34,7 @@ def trouver_secteur(batiment):
 
 st.set_page_config(page_title="Unité Logement - Gestion Planning", layout="wide", page_icon="📍")
 
+# Initialisation sécurisée de la base de données
 if 'db' not in st.session_state:
     st.session_state.db = pd.DataFrame(columns=['ID', 'Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Type', 'Statut', 'Date_Sort'])
 
@@ -72,26 +73,28 @@ with st.sidebar:
             df_ex = pd.read_excel(up).dropna(how='all').fillna('')
             df_ex.columns = df_ex.columns.str.strip()
             
-            # Identification colonnes
+            # Mapping flexible des colonnes pour éviter les KeyError
             c_id = next((c for c in df_ex.columns if 'id' in c.lower() or 'n°' in c.lower()), df_ex.columns[0])
             c_date = next((c for c in df_ex.columns if 'date' in c.lower()), 'Date')
             c_statut = next((c for c in df_ex.columns if 'statut' in c.lower()), 'Statut')
             c_absent = next((c for c in df_ex.columns if 'absent' in c.lower()), None)
+            c_type = next((c for c in df_ex.columns if 'type' in c.lower()), 'Type')
+            c_bat = next((c for c in df_ex.columns if 'bat' in c.lower() or 'bât' in c.lower()), 'Batiment')
             
-            temp = pd.DataFrame(columns=['ID', 'Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Type', 'Statut', 'Date_Sort'])
+            temp_list = []
             df_ex[c_date] = pd.to_datetime(df_ex[c_date])
             
             # Traitement par jour
             for jour in sorted(df_ex[c_date].unique()):
                 ds = pd.to_datetime(jour).strftime('%d/%m/%Y')
                 df_j = df_ex[df_ex[c_date] == jour].copy()
-                df_j['Secteur'] = df_j['Batiment'].apply(trouver_secteur)
+                df_j['Secteur'] = df_j[c_bat].apply(trouver_secteur)
                 
-                # Distribution par secteur pour grouper les agents au même endroit
+                # Distribution par secteur
                 for secteur in df_j['Secteur'].unique():
                     df_s = df_j[df_j['Secteur'] == secteur]
                     
-                    # On fait tourner les agents disponibles pour équilibrer le bâtiment
+                    # On tourne sur les agents pour équilibrer
                     idx_agt = 0
                     for _, row in df_s.iterrows():
                         bloc = "Après-midi" if "midi" in str(row[c_statut]).lower() else "Matin"
@@ -100,42 +103,47 @@ with st.sidebar:
                         
                         agt_elu, h_finale = "⚠️ SANS AGENT", "08:15"
                         if presents:
+                            # Créer un DataFrame temporaire à partir de la liste pour les calculs de créneaux
+                            current_temp_db = pd.DataFrame(temp_list) if temp_list else pd.DataFrame(columns=['Date', 'Agent', 'Heure', 'Rue'])
+                            
                             for _ in range(len(presents)):
                                 p = presents[idx_agt % len(presents)]
-                                res_h, possible = calculer_creneau(p, ds, temp, row['Batiment'], bloc)
+                                res_h, possible = calculer_creneau(p, ds, current_temp_db, row[c_bat], bloc)
                                 if possible:
                                     agt_elu, h_finale = p, res_h
                                     idx_agt += 1
                                     break
                                 idx_agt += 1
 
-                        new_row = pd.DataFrame([{
-                            'ID': row[c_id], 'Batiment': row['Batiment'], 'Date': ds, 'Heure': h_finale, 
-                            'Agent': agt_elu, 'Type': row.get('Type', 'Mission'), 
-                            'Rue': INFOS_BATIMENTS.get(row['Batiment'], {}).get('rue', ''), 
+                        temp_list.append({
+                            'ID': row[c_id], 'Batiment': row[c_bat], 'Date': ds, 'Heure': h_finale, 
+                            'Agent': agt_elu, 'Type': row[c_type] if c_type in row else "Mission", 
+                            'Rue': INFOS_BATIMENTS.get(row[c_bat], {}).get('rue', ''), 
                             'Statut': bloc, 'Date_Sort': jour
-                        }])
-                        temp = pd.concat([temp, new_row], ignore_index=True)
+                        })
 
-            st.session_state.db = temp
+            st.session_state.db = pd.DataFrame(temp_list)
             st.rerun()
         except Exception as e:
-            st.error(f"Erreur de lecture : {e}")
+            st.error(f"Erreur : {e}")
 
 # --- AFFICHAGE ---
 if not st.session_state.db.empty:
     with t1:
-        st.dataframe(st.session_state.db[['ID', 'Date', 'Statut', 'Heure', 'Agent', 'Batiment', 'Type']].sort_values(['Date_Sort', 'Heure']), use_container_width=True)
+        # Tri et affichage propre
+        df_display = st.session_state.db.sort_values(['Date_Sort', 'Heure'])
+        st.dataframe(df_display[['ID', 'Date', 'Statut', 'Heure', 'Agent', 'Batiment', 'Type']], use_container_width=True)
     
     with t2:
-        sel_j = st.selectbox("Sélectionner une date :", sorted(st.session_state.db['Date'].unique()))
+        dates_dispo = sorted(st.session_state.db['Date'].unique(), key=lambda x: datetime.strptime(x, '%d/%m/%Y'))
+        sel_j = st.selectbox("Sélectionner une date :", dates_dispo)
         cols = st.columns(len(AGENTS))
         for i, a in enumerate(AGENTS):
             with cols[i]:
-                st.markdown(f"<div style='text-align:center; background-color:{COULEURS[a]}; padding:10px; border-radius:5px; font-weight:bold;'>{a}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div style='text-align:center; background-color:{COULEURS[a]}; padding:10px; border-radius:5px; font-weight:bold; color:black;'>{a}</div>", unsafe_allow_html=True)
                 m = st.session_state.db[(st.session_state.db['Date'] == sel_j) & (st.session_state.db['Agent'] == a)].sort_values('Heure')
                 for _, r in m.iterrows():
-                    st.markdown(f"<div style='background-color:{COULEURS[a]}; padding:8px; border-radius:5px; border:1px solid #ccc; margin-top:5px;'>🆔 {r['ID']}<br>🕒 <b>{r['Heure']}</b><br>🏠 {r['Batiment']}</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div style='background-color:{COULEURS[a]}; padding:8px; border-radius:5px; border:1px solid #ccc; margin-top:5px; color:black;'>🆔 {r['ID']}<br>🕒 <b>{r['Heure']}</b><br>🏠 {r['Batiment']}</div>", unsafe_allow_html=True)
 else:
     st.info("Veuillez importer un fichier Excel pour générer le planning.")
 
