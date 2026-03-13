@@ -296,11 +296,11 @@ with t0:
             df_filtre = df_filtre[masque]
 
         # Indicateurs
-c1, c2 = st.columns(2)
-c1.metric("Logements trouvés", len(df_filtre))
-c2.metric("Immeubles distincts", df_filtre["Adresse"].nunique())
+        c1, c2 = st.columns(2)
+        c1.metric("Logements trouvés", len(df_filtre))
+        c2.metric("Immeubles distincts", df_filtre["Adresse"].nunique())
 
-        # Indicateur détaillé par bâtiment
+        # Répartition par immeuble
         if "Adresse" in df_filtre.columns:
             st.markdown("### 📊 Répartition par immeuble")
             repartition = (
@@ -310,9 +310,6 @@ c2.metric("Immeubles distincts", df_filtre["Adresse"].nunique())
             )
             repartition.columns = ["Adresse", "Nombre de logements"]
             st.dataframe(repartition, use_container_width=True)
-
-    else:
-        st.info("Aucune liste de logements chargée.")
 
 # --- ONGLETS PLANNING / RAPPORTS ---
 if not st.session_state.db.empty:
