@@ -85,7 +85,7 @@ section[data-testid="stSidebar"] .stButton > button:hover {
 
 /* Titres et textes principaux seulement */
 h1, h2, h3, h4, h5, h6, p, label, span, div {
-    color: white;
+    color: 4c1130;
 }
 
 /* Onglets */
