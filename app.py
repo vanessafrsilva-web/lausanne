@@ -402,7 +402,7 @@ with t_ai:
 
                 colonnes_a_supprimer = [
                     "Type exploitation",
-                    "date_fifo"
+                    "date_fifo",
                     "score"
                 ]
 
