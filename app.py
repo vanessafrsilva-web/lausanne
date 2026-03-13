@@ -38,6 +38,22 @@ st.markdown("""
 section[data-testid="stSidebar"] {
     background-color: #ffffff;
 }
+/* Fond principal de l'app */
+[data-testid="stAppViewContainer"] {
+    background-color: #173a5e;
+}
+
+/* Zone centrale (contenu) */
+.main {
+    background-color: #173a5e;
+}
+
+/* Texte principal en blanc */
+[data-testid="stAppViewContainer"] * {
+    color: white;
+}
+
+</style>
 
 section[data-testid="stSidebar"] * {
     color: #102a43;
