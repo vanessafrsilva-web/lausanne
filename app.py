@@ -217,17 +217,17 @@ with t0:
 
         col1, col2, col3 = st.columns(3)
 
-        with col1:
-            villes = ["Toutes"] + sorted(df_log["Ville"].dropna().astype(str).unique().tolist())
-            ville_sel = st.selectbox("Ville", villes)
+with col1:
+    villes = ["Toutes"] + sorted(df_log["Ville"].dropna().astype(str).unique().tolist())
+    ville_sel = st.selectbox("Ville", villes, key="vacants_ville")
 
-        with col2:
-            immeubles = ["Tous"] + sorted(df_log["Adresse"].dropna().astype(str).unique().tolist())
-            immeuble_sel = st.selectbox("Adresse / Immeuble", immeubles)
+with col2:
+    immeubles = ["Tous"] + sorted(df_log["Adresse"].dropna().astype(str).unique().tolist())
+    immeuble_sel = st.selectbox("Adresse / Immeuble", immeubles, key="vacants_immeuble")
 
-        with col3:
-            types_objet = ["Tous"] + sorted(df_log["Type objet"].dropna().astype(str).unique().tolist())
-            type_objet_sel = st.selectbox("Type d'objet", types_objet)
+with col3:
+    types_objet = ["Tous"] + sorted(df_log["Type objet"].dropna().astype(str).unique().tolist())
+    type_objet_sel = st.selectbox("Type d'objet", types_objet, key="vacants_type_objet")
 
         
         df_filtre = df_log.copy()
@@ -289,38 +289,48 @@ with t_ai:
                 key="ai_type_objet"
             )
 
-        with col2:
-      
-    loyer_min = st.number_input("Loyer minimum", min_value=0.0, value=0.0, step=50.0, key="ai_loyer_min")
-    loyer_max = st.number_input("Loyer maximum", min_value=0.0, value=700.0, step=50.0, key="ai_loyer_max")
+            loyer_min = st.number_input(
+                "Loyer minimum",
+                min_value=0.0,
+                value=0.0,
+                step=50.0,
+                key="ai_loyer_min"
+            )
 
-    parking = st.radio("Parking", ["Non", "Oui"], key="ai_parking")
-    piquet = st.radio("Piquet", ["Non", "Oui"], key="ai_piquet")
-    accompagne_2 = st.radio("Accompagné à 2 personnes", ["Non", "Oui"], key="ai_accompagne_2")
-    accompagne_plus_2 = st.radio("Accompagné à plus de 2 personnes", ["Non", "Oui"], key="ai_accompagne_plus_2")
+            loyer_max = st.number_input(
+                "Loyer maximum",
+                min_value=0.0,
+                value=700.0,
+                step=50.0,
+                key="ai_loyer_max"
+            )
+
+        with col2:
+            parking = st.radio("Parking", ["Non", "Oui"], key="ai_parking")
+            piquet = st.radio("Piquet", ["Non", "Oui"], key="ai_piquet")
+            accompagne_2 = st.radio("Accompagné à 2 personnes", ["Non", "Oui"], key="ai_accompagne_2")
+            accompagne_plus_2 = st.radio("Accompagné à plus de 2 personnes", ["Non", "Oui"], key="ai_accompagne_plus_2")
 
         demande = st.text_area(
             "Demande utilisateur",
-            placeholder="Ex: studio Lausanne max 1400 proche centre",
+            placeholder="Ex: 1 personne, parking, piquet",
             key="ai_demande"
         )
 
         if st.button("🔎 Chercher les meilleurs logements", key="ai_btn_recherche"):
-           
-               criteres = {
-    "ville": ville,
-    "type_objet": type_objet,
-    "loyer_min": loyer_min,
-    "loyer_max": loyer_max,
-    "parking": parking,
-    "piquet": piquet,
-    "accompagne_2": accompagne_2,
-    "accompagne_plus_2": accompagne_plus_2,
-    "mot_cle": demande
-
+            criteres = {
+                "ville": ville,
+                "type_objet": type_objet,
+                "loyer_min": loyer_min,
+                "loyer_max": loyer_max,
+                "parking": parking,
+                "piquet": piquet,
+                "accompagne_2": accompagne_2,
+                "accompagne_plus_2": accompagne_plus_2,
+                "mot_cle": demande
             }
 
-            resultats = recommander_logements(df_log, criteres)
+            resultats = recommander_logements(df_log, criteres, top_n=3)
 
             if resultats.empty:
                 st.warning("Aucun logement correspondant.")
@@ -344,8 +354,11 @@ with t_attrib:
     if not st.session_state.logements.empty:
         df_log = st.session_state.logements.copy()
 
-        logements_options = df_log["Numéro unique"].dropna().astype(str).tolist()
-        logement_selectionne = st.selectbox("Choisir un logement", logements_options)
+  logement_selectionne = st.selectbox(
+    "Choisir un logement",
+    logements_options,
+    key="attrib_logement"
+)
 
         logement_info = df_log[df_log["Numéro unique"].astype(str) == logement_selectionne].iloc[0]
 
