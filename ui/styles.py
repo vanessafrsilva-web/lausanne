@@ -7,7 +7,7 @@ def appliquer_styles():
 
     /* SIDEBAR */
     section[data-testid="stSidebar"] {
-        background-color: #f7f9fc;
+        background-color: #073763;
     }
 
     /* Boutons sidebar */
