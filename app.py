@@ -5,6 +5,7 @@ import io
 import plotly.express as px
 import numpy as np
 from ui.styles import appliquer_styles
+from modules.recommandation import recommander_logements
 
 from modules.data_loader import charger_logements
 from config.settings import (
@@ -73,7 +74,7 @@ if "attributions" not in st.session_state:
 # --- INTERFACE ---
 st.title("📍 Unité Logement : 2.0")
 
-t0, t_reco, t_attrib, t1, t2, t3 = st.tabs([
+t0, t_ai, t_attrib, t1, t2, t3 = st.tabs([
     "🏠 Logements vacants",
     "🤖 Recherche intelligente",
     "📝 Attribution logement",
@@ -269,7 +270,57 @@ with t0:
     else:
         st.info("Aucune liste de logements chargée.")
 
+with t_ai:
 
+    st.subheader("🤖 Recherche intelligente de logements")
+
+    if not st.session_state.logements.empty:
+
+        df_log = st.session_state.logements.copy()
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            villes = ["Toutes"] + sorted(df_log["Ville"].dropna().astype(str).unique().tolist())
+            ville = st.selectbox("Ville souhaitée", villes)
+
+            type_objet = st.selectbox(
+                "Type d'objet",
+                ["Tous"] + sorted(df_log["Type objet"].dropna().astype(str).unique().tolist())
+            )
+
+        with col2:
+            budget = st.number_input("Budget maximum", 0.0, 5000.0, 1500.0)
+            surface = st.number_input("Surface minimale", 0.0, 200.0, 20.0)
+
+        demande = st.text_area(
+            "Demande utilisateur",
+            placeholder="Ex: studio Lausanne max 1400 proche centre"
+        )
+
+        if st.button("🔎 Chercher les meilleurs logements"):
+
+            criteres = {
+                "ville": ville,
+                "type_objet": type_objet,
+                "budget_max": budget,
+                "surface_min": surface,
+                "mot_cle": demande
+            }
+
+            resultats = recommander_logements(df_log, criteres)
+
+            if resultats.empty:
+                st.warning("Aucun logement correspondant.")
+            else:
+
+                st.success("Voici les meilleurs logements proposés :")
+
+                st.data_editor(
+                    resultats,
+                    use_container_width=True,
+                    disabled=True
+                )
 # --- ONGLET ATTRIBUTION ---
 with t_attrib:
     st.subheader("📝 Formulaire d'attribution")
