@@ -31,6 +31,7 @@ st.set_page_config(
 )
 
 # -- Visuel CSS
+# -- Visuel CSS
 st.markdown("""
 <style>
 
@@ -38,25 +39,24 @@ st.markdown("""
 section[data-testid="stSidebar"] {
     background-color: #ffffff;
 }
+
+section[data-testid="stSidebar"] * {
+    color: #102a43;
+}
+
 /* Fond principal de l'app */
 [data-testid="stAppViewContainer"] {
     background-color: #173a5e;
 }
 
-/* Zone centrale (contenu) */
+/* Zone centrale */
 .main {
     background-color: #173a5e;
 }
 
-/* Texte principal en blanc */
+/* Texte principal */
 [data-testid="stAppViewContainer"] * {
     color: white;
-}
-
-</style>
-
-section[data-testid="stSidebar"] * {
-    color: #102a43;
 }
 
 /* uploader sidebar */
@@ -64,9 +64,10 @@ section[data-testid="stSidebar"] [data-testid="stFileUploader"] {
     border: 1px solid #dbe3f1;
     border-radius: 10px;
     padding: 12px;
+    background-color: #ffffff;
 }
 
-/* bouton */
+/* bouton sidebar */
 section[data-testid="stSidebar"] .stButton > button {
     background-color: #2E6BF6;
     color: white;
