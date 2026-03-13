@@ -130,11 +130,30 @@ if "logements" not in st.session_state:
     st.session_state.logements = pd.DataFrame()
 
 
+if "attributions" not in st.session_state:
+    st.session_state.attributions = pd.DataFrame(columns=[
+        "Nom",
+        "Prénom",
+        "Sexe",
+        "Fonction",
+        "Bâtiment",
+        "Studio",
+        "Type objet",
+        "Prix logement",
+        "Nom 2ème personne",
+        "Parc",
+        "Type parc",
+        "Prix parc",
+        "Facture",
+        "Salaire",
+        "Ancien locataire"
+    ])
 # --- INTERFACE ---
 st.title("📍 Unité Logement : 2.0")
 
-t0, t1, t2, t3 = st.tabs([
+t0, t_attrib, t1, t2, t3 = st.tabs([
     "🏠 Logements vacants",
+    "📝 Attribution logement",
     "📝 Planning Global",
     "📅 Vue par Agent",
     "📊 Rapports & Analyses"
@@ -333,9 +352,87 @@ if not st.session_state.logements.empty:
 
 else:
     st.info("Aucune liste de logements chargée.")
+    
+with t_attrib:
+    st.subheader("📝 Formulaire d'attribution")
 
-# --- ONGLETS PLANNING / RAPPORTS ---
-if not st.session_state.db.empty:
+    if not st.session_state.logements.empty:
+        df_log = st.session_state.logements.copy()
+
+        logements_options = df_log["Numéro unique"].dropna().astype(str).tolist()
+        logement_selectionne = st.selectbox("Choisir un logement", logements_options)
+
+        logement_info = df_log[df_log["Numéro unique"].astype(str) == logement_selectionne].iloc[0]
+
+        st.markdown("### 🏠 Informations du logement")
+        st.write("**Bâtiment / Adresse :**", logement_info.get("Adresse", ""))
+        st.write("**Ville :**", logement_info.get("Ville", ""))
+        st.write("**Type objet :**", logement_info.get("Type objet", ""))
+        st.write("**Surface :**", logement_info.get("Surface", ""))
+    else:
+        st.warning("Charge d'abord la liste des logements vacants dans la sidebar.")
+        st.markdown("### 👤 Informations du locataire")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            nom = st.text_input("Nom")
+            prenom = st.text_input("Prénom")
+            sexe = st.radio("Sexe", ["Masculin", "Féminin"])
+
+        with col2:
+            fonction = st.text_input("Fonction")
+            nom_2eme = st.text_input("Nom pour la 2ème personne")
+            ancien_locataire = st.text_input("Nom de l'ancien locataire")
+                    st.markdown("### 🚗 Place de parc et administratif")
+
+        col3, col4 = st.columns(2)
+
+        with col3:
+            parc = st.text_input("Parc #")
+            type_parc = st.radio("Type de parc", ["Intérieur", "Extérieur"])
+            prix_parc = st.number_input("Prix parc", min_value=0.0, value=0.0)
+
+        with col4:
+            facture = st.text_input("Facture")
+            salaire = st.text_input("Salaire")
+
+        if st.button("✅ Valider l'attribution"):
+            nouvelle_attribution = pd.DataFrame([{
+                "Nom": nom,
+                "Prénom": prenom,
+                "Sexe": sexe,
+                "Fonction": fonction,
+                "Bâtiment": logement_info.get("Adresse", ""),
+                "Studio": logement_info.get("Numéro unique", ""),
+                "Type objet": logement_info.get("Type objet", ""),
+                "Prix logement": logement_info.get("Prix", ""),
+                "Nom 2ème personne": nom_2eme,
+                "Parc": parc,
+                "Type parc": type_parc,
+                "Prix parc": prix_parc,
+                "Facture": facture,
+                "Salaire": salaire,
+                "Ancien locataire": ancien_locataire
+            }])
+
+            st.session_state.attributions = pd.concat(
+                [st.session_state.attributions, nouvelle_attribution],
+                ignore_index=True
+            )
+
+            st.success("Attribution enregistrée avec succès.")
+                    st.markdown("### 📋 Attributions enregistrées")
+        st.dataframe(st.session_state.attributions, use_container_width=True)
+with t_attrib:
+    st.subheader("📝 Formulaire d'attribution")
+
+    if not st.session_state.logements.empty:
+        st.info("Choisis d'abord un logement, puis remplis les informations du locataire.")
+    else:
+        st.warning("Charge d'abord la liste des logements vacants dans l'onglet sidebar.")
+        
+        if not st.session_state.db.empty:
 
     with t1:
         df_v = st.session_state.db.sort_values(["Date_Sort", "Heure"])
