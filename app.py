@@ -344,38 +344,29 @@ with t_ai:
                 }
 
                 resultats = recommander_logements(df_log, criteres, top_n=3)
-
-                if resultats.empty:
-                    st.warning("Aucun logement correspondant.")
-                else:
-                    st.success("Voici les meilleurs logements proposés :")
-                    st.data_editor(
-                        resultats,
-                        use_container_width=True,
-                        disabled=True,
-                        key="ai_resultats"
-                    )
+                st.session_state["ai_resultats_df"] = resultats.copy()
 
         with colB:
-            if st.button("♻️ Reset recherche", key="ai_reset"):
-                st.session_state.ai_ville = "Toutes"
-                st.session_state.ai_type_objet = "Tous"
-                st.session_state.ai_loyer_min = 0.0
-                st.session_state.ai_loyer_max = 700.0
-                st.session_state.ai_parking = "Non"
-                st.session_state.ai_piquet = "Non"
-                st.session_state.ai_accompagne_2 = "Non"
-                st.session_state.ai_accompagne_plus_2 = "Non"
-                st.session_state.ai_demande = ""
+            st.button(
+                "♻️ Reset recherche",
+                key="ai_reset",
+                on_click=reset_recherche_ia
+            )
 
-                if "ai_resultats" in st.session_state:
-                    del st.session_state["ai_resultats"]
-
-                st.rerun()
+        if "ai_resultats_df" in st.session_state:
+            if st.session_state["ai_resultats_df"].empty:
+                st.warning("Aucun logement correspondant.")
+            else:
+                st.success("Voici les meilleurs logements proposés :")
+                st.data_editor(
+                    st.session_state["ai_resultats_df"],
+                    use_container_width=True,
+                    disabled=True,
+                    key="ai_resultats"
+                )
 
     else:
         st.info("Charge d'abord la liste des logements vacants dans la sidebar.")
-
 
 # --- ONGLET ATTRIBUTION ---
 with t_attrib:
