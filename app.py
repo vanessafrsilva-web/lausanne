@@ -112,6 +112,7 @@ t0, t1, t2, t3 = st.tabs([
 with st.sidebar:
 
     st.header("📂 Importation")
+    st.caption("Formats acceptés : XLSX")
 
     up = st.file_uploader(
         "Déposer le fichier des missions",
@@ -120,6 +121,7 @@ with st.sidebar:
     )
 
     st.subheader("🏠 Logements vacants")
+    st.caption("Formats acceptés : CSV ou XLSX")
 
     up_logements = st.file_uploader(
         "Déposer la liste des appartements vacants",
