@@ -168,6 +168,14 @@ with t0:
     if not st.session_state.logements.empty:
 
         df_log = st.session_state.logements.copy()
+        df_log["Surface"] = (
+    df_log["Surface"]
+    .astype(str)
+    .str.replace(",", ".", regex=False)
+    .str.extract(r"(\d+\.?\d*)")[0]
+)
+
+df_log["Surface"] = pd.to_numeric(df_log["Surface"], errors="coerce")
 
         col1, col2, col3 = st.columns(3)
 
