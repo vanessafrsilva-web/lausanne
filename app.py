@@ -109,7 +109,29 @@ div[role="listbox"] {
 .stTextInput input::placeholder {
     color: #cfe2f3;
 }
+/* TABLE / DATAFRAME FOND BLANC */
+[data-testid="stDataFrame"] {
+    background-color: white !important;
+    color: black !important;
+    border-radius: 10px;
+}
 
+/* header table */
+[data-testid="stDataFrame"] thead tr th {
+    background-color: #f5f7fb !important;
+    color: #073763 !important;
+}
+
+/* cellules */
+[data-testid="stDataFrame"] tbody tr td {
+    background-color: white !important;
+    color: black !important;
+}
+
+/* hover lignes */
+[data-testid="stDataFrame"] tbody tr:hover {
+    background-color: #eef3fb !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
