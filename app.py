@@ -55,7 +55,7 @@ section[data-testid="stSidebar"] * {
 
 /* Zone centrale */
 .main {
-    background-color: #173a5e;
+    background-color: #073763;
 }
 
 /* Texte principal */
