@@ -55,6 +55,36 @@ def trouver_secteur(batiment):
 
 
 # --- SESSION STATE ---
+if "ai_ville" not in st.session_state:
+    st.session_state.ai_ville = "Toutes"
+
+if "ai_type_objet" not in st.session_state:
+    st.session_state.ai_type_objet = "Tous"
+
+if "ai_loyer_min" not in st.session_state:
+    st.session_state.ai_loyer_min = 0.0
+
+if "ai_loyer_max" not in st.session_state:
+    st.session_state.ai_loyer_max = 700.0
+
+if "ai_parking" not in st.session_state:
+    st.session_state.ai_parking = "Non"
+
+if "ai_piquet" not in st.session_state:
+    st.session_state.ai_piquet = "Non"
+
+if "ai_accompagne_2" not in st.session_state:
+    st.session_state.ai_accompagne_2 = "Non"
+
+if "ai_accompagne_plus_2" not in st.session_state:
+    st.session_state.ai_accompagne_plus_2 = "Non"
+
+if "ai_demande" not in st.session_state:
+    st.session_state.ai_demande = ""
+
+if "ai_resultats_df" not in st.session_state:
+    st.session_state.ai_resultats_df = pd.DataFrame()
+    
 if "db" not in st.session_state:
     st.session_state.db = pd.DataFrame(
         columns=["ID", "Batiment", "Date", "Heure", "Agent", "Rue", "Type", "Statut", "Date_Sort"]
