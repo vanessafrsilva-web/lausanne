@@ -34,36 +34,37 @@ st.set_page_config(
 st.markdown("""
 <style>
 
-/* SIDEBAR */
+/* SIDEBAR BLANCHE */
 section[data-testid="stSidebar"] {
-    background-color: #073763;
+    background-color: #ffffff;
 }
 
+/* TEXTE SIDEBAR BLEU */
 section[data-testid="stSidebar"] * {
-    color: white;
+    color: #073763;
 }
 
-/* Uploaders sidebar */
+/* uploaders sidebar */
 section[data-testid="stSidebar"] [data-testid="stFileUploader"] {
     border-radius: 10px;
     padding: 12px;
-    background-color: #5086c4;
-    border: none;
+    background-color: #eef4fb;
+    border: 1px solid #dbe3f1;
 }
 
-/* Boutons sidebar */
+/* boutons sidebar */
 section[data-testid="stSidebar"] .stButton > button {
-    background-color: white;
-    color: #073763;
+    background-color: #073763;
+    color: white;
     border-radius: 8px;
     border: none;
 }
 
 section[data-testid="stSidebar"] .stButton > button:hover {
-    background-color: #9fc5e8;
+    background-color: #1f4e79;
 }
 
-/* FOND PRINCIPAL */
+/* FOND PRINCIPAL APP */
 [data-testid="stAppViewContainer"] {
     background-color: #073763;
 }
@@ -73,20 +74,20 @@ section[data-testid="stSidebar"] .stButton > button:hover {
     color: white;
 }
 
-/* FILTRES (selectbox + input) */
+/* SELECTBOX (filtres) */
 .stSelectbox div[data-baseweb="select"] > div {
     background-color: #1f3b63 !important;
     color: white !important;
     border-radius: 8px;
 }
 
-/* Dropdown menu */
+/* menu dropdown */
 div[role="listbox"] {
     background-color: #1f3b63 !important;
     color: white !important;
 }
 
-/* Champ number input */
+/* number input */
 .stNumberInput input {
     background-color: #1f3b63 !important;
     color: white !important;
