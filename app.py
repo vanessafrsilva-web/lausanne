@@ -73,14 +73,14 @@ section[data-testid="stSidebar"] [data-testid="stFileUploader"] {
 
 /* bouton sidebar */
 section[data-testid="stSidebar"] .stButton > button {
-    background-color: #cc0000;
+    background-color: #0b5394;
     color: #fffff;
     border-radius: 8px;
     border: none;
 }
 
 section[data-testid="stSidebar"] .stButton > button:hover {
-    background-color: #0b5394;
+    background-color: #9fc5e8;
 }
 
 </style>
