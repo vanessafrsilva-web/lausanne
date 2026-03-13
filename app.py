@@ -15,7 +15,6 @@ from config.settings import (
     SECTEURS
 )
 
-from 
 from modules.distance import calculer_distance
 from modules.calendar import generer_ics
 from modules.scheduler import calculer_creneau
