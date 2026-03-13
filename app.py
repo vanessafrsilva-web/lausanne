@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 import io
 import plotly.express as px
 import numpy as np
+
 from config.settings import (AGENTS, BUREAU_ADRESSE, BUREAU_GPS, COULEURS,   INFOS_BATIMENTS,   SECTEURS)
 from modules.distance import calculer_distance
 from modules.calendar import generer_ics
