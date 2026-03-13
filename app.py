@@ -64,6 +64,32 @@ section[data-testid="stSidebar"] .stButton > button:hover {
     background-color: #1f4e79;
 }
 
+
+/* Champ recherche texte */
+.stTextInput input {
+    background-color: #1f3b63 !important;
+    color: white !important;
+    border-radius: 8px;
+    border: 1px solid #9fc5e8;
+}
+
+/* placeholder texte */
+.stTextInput input::placeholder {
+    color: #cfe2f3;
+}
+
+/* focus */
+.stTextInput input:focus {
+    border: 1px solid #ffffff;
+}
+
+/* curseur */
+.stTextInput input {
+    caret-color: white;
+}
+
+</style>
+""", unsafe_allow_html=True)
 /* FOND PRINCIPAL APP */
 [data-testid="stAppViewContainer"] {
     background-color: #073763;
