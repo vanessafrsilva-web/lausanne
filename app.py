@@ -61,7 +61,7 @@ section[data-testid="stSidebar"] * {
 
 /* Texte principal */
 [data-testid="stAppViewContainer"] * {
-        color: #173a5e;
+        color: #fffff;
 }
 
 /* uploader sidebar */
@@ -74,14 +74,14 @@ section[data-testid="stSidebar"] [data-testid="stFileUploader"] {
 
 /* bouton sidebar */
 section[data-testid="stSidebar"] .stButton > button {
-    background-color: #FCB542;
+    background-color: #b45f06;
     color: white;
     border-radius: 8px;
     border: none;
 }
 
 section[data-testid="stSidebar"] .stButton > button:hover {
-    background-color: #C27BA0;
+    background-color: #a64d79;
 }
 
 </style>
