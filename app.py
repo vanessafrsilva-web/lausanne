@@ -44,9 +44,14 @@ section[data-testid="stSidebar"] * {
     color: #102a43;
 }
 
-/* Fond principal de l'app */
 [data-testid="stAppViewContainer"] {
-    background-color: #173a5e;
+    background-color: #eef4fb;
+}
+
+.main {
+    background-color: #eef4fb;
+}
+
 }
 
 /* Zone centrale */
@@ -56,7 +61,7 @@ section[data-testid="stSidebar"] * {
 
 /* Texte principal */
 [data-testid="stAppViewContainer"] * {
-    color: white;
+        color: #173a5e;
 }
 
 /* uploader sidebar */
