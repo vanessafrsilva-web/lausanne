@@ -299,6 +299,8 @@ with t0:
         c1, c2 = st.columns(2)
         c1.metric("Logements trouvés", len(df_filtre))
         c2.metric("Immeubles distincts", df_filtre["Adresse"].nunique())
+# Tableau des logements
+st.dataframe(df_filtre, use_container_width=True)
 
         # Répartition par immeuble
         if "Adresse" in df_filtre.columns:
@@ -310,6 +312,7 @@ with t0:
             )
             repartition.columns = ["Adresse", "Nombre de logements"]
             st.dataframe(repartition, use_container_width=True)
+
 
 # --- ONGLETS PLANNING / RAPPORTS ---
 if not st.session_state.db.empty:
