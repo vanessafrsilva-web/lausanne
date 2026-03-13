@@ -255,7 +255,7 @@ with t0:
         # Recherche rapide
         recherche = st.text_input(
             "🔎 Recherche rapide",
-            placeholder="Ex: Lausanne, Montolieu, V01934, Habitat..."
+            placeholder="Ex: Lausanne, Montolieu, N° Studio..."
         )
 
         col1, col2, col3 = st.columns(3)
