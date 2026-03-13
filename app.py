@@ -116,7 +116,7 @@ if "logements" not in st.session_state:
 
 
 # --- INTERFACE ---
-st.title("📍 Unité Logement : Planning & Rapports")
+st.title("📍 Unité Logement : 2.0")
 
 t0, t1, t2, t3 = st.tabs([
     "🏠 Logements vacants",
