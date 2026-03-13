@@ -77,7 +77,7 @@ def appliquer_styles():
 
     /* Caption / petit texte */
     [data-testid="stCaptionContainer"] {
-        color: #5b6575 !important;
+        color: #073763 !important;
     }
 
     /* Alertes info/success/warning */
