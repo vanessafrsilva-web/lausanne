@@ -40,7 +40,6 @@ section[data-testid="stSidebar"] {
     background-color: #ffffff;
 }
 
-
 /* uploaders sidebar */
 section[data-testid="stSidebar"] [data-testid="stFileUploader"] {
     border-radius: 10px;
@@ -58,7 +57,7 @@ section[data-testid="stSidebar"] .stButton > button {
 }
 
 section[data-testid="stSidebar"] .stButton > button:hover {
-    background-color: #ffffff;
+    background-color: #073763;
     color: white;
 }
 
