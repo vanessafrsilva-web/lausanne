@@ -27,11 +27,23 @@ def trouver_secteur(batiment):
 
 if 'db' not in st.session_state:
     st.session_state.db = pd.DataFrame(columns=['ID', 'Batiment', 'Date', 'Heure', 'Agent', 'Rue', 'Type', 'Statut', 'Date_Sort'])
-
+if up_logements and st.button("🏠 Charger les logements"):
+    try:
+        df_logements = charger_logements(up_logements)
+        st.session_state.logements = df_logements
+        st.success("Liste des logements chargée")
+    except Exception as e:
+        st.error(f"Erreur : {e}")
 
 # --- INTERFACE ---
 st.title("📍 Unité Logement : Planning & Rapports")
-t0, t1, t2, t3 = st.tabs(["📝 Planning Global", "📅 Vue par Agent", "📊 Rapports & Analyses"])
+t0, t1, t2, t3 = st.tabs([
+    "🏠 Logements vacants",
+    "📝 Planning Global",
+    "📅 Vue par Agent",
+    "📊 Rapports & Analyses"
+])
+
 
 with st.sidebar:
     st.header("📂 Importation")
@@ -88,6 +100,21 @@ up_logements = st.file_uploader(
             st.error(f"Erreur : {e}")
 
 if not st.session_state.db.empty:
+
+    with t0:
+
+    st.subheader("🏠 Logements disponibles")
+
+    if "logements" in st.session_state:
+
+        df_log = st.session_state.logements
+
+        st.dataframe(df_log, use_container_width=True)
+
+    else:
+
+        st.info("Aucune liste de logements chargée.")
+        
     with t1:
         df_v = st.session_state.db.sort_values(['Date_Sort', 'Heure'])
         def style_agent(row):
