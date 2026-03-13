@@ -69,7 +69,7 @@ section[data-testid="stSidebar"] .stButton > button {
     background-color: #4c1130;
     color: white;
     border-radius: 8px;
-    border: 1px solid #0b3f75;
+    border: 1px solid #ffffff;
 }
 
 section[data-testid="stSidebar"] .stButton > button:hover {
@@ -80,7 +80,7 @@ section[data-testid="stSidebar"] .stButton > button:hover {
 
 /* Fond principal */
 [data-testid="stAppViewContainer"] {
-    background-color: #073763;
+    background-color: #cfe2f3;
 }
 
 /* Titres et textes principaux seulement */
