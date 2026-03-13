@@ -33,65 +33,48 @@ st.set_page_config(
 #--Visuelle CSS
 st.markdown("""
 <style>
-
 /* Sidebar */
 section[data-testid="stSidebar"] {
     background-color: #102a43;
 }
-
 section[data-testid="stSidebar"] * {
     color: white;
 }
 
-/* Zone uploader */
+/* Zone upload */
 section[data-testid="stSidebar"] .stFileUploader {
     background-color: #1f3b63;
-    padding: 12px;
-    border-radius: 10px;
+    padding: 14px;
+    border-radius: 12px;
+    border: 1px solid #2E6BF6;
 }
 
-/* Bloc interne uploader */
-section[data-testid="stSidebar"] .stFileUploader > div {
-    background-color: #1f3b63 !important;
-    border: 1px solid #2E6BF6 !important;
-    border-radius: 10px;
-}
-
-/* Bouton Browse files */
+/* Cache le bouton natif illisible */
 section[data-testid="stSidebar"] .stFileUploader button {
-    background: #ffffff !important;
-    color: #102a43 !important;
-    border: 1px solid #d0d7e2 !important;
-    border-radius: 8px !important;
-    opacity: 1 !important;
-    font-weight: 600 !important;
+    opacity: 0 !important;
+    height: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
 }
 
-/* Texte du bouton */
-section[data-testid="stSidebar"] .stFileUploader button * {
-    color: #102a43 !important;
-    opacity: 1 !important;
+/* Rend le texte de la zone visible */
+section[data-testid="stSidebar"] .stFileUploader small,
+section[data-testid="stSidebar"] .stFileUploader span,
+section[data-testid="stSidebar"] .stFileUploader div {
+    color: white !important;
 }
 
-/* Hover */
-section[data-testid="stSidebar"] .stFileUploader button:hover {
-    background: #eef4ff !important;
-    color: #102a43 !important;
-}
-
-/* Boutons normaux sidebar */
+/* Boutons sidebar */
 section[data-testid="stSidebar"] .stButton > button {
     background-color: #2E6BF6 !important;
     color: white !important;
     border-radius: 8px !important;
     border: none !important;
 }
-
 section[data-testid="stSidebar"] .stButton > button:hover {
     background-color: #1c4ed8 !important;
-    color: white !important;
 }
-
 </style>
 """, unsafe_allow_html=True)
 
@@ -128,19 +111,17 @@ t0, t1, t2, t3 = st.tabs([
 with st.sidebar:
     st.header("📂 Importation")
 
-    up = st.file_uploader(
-        "Fichier Excel des missions",
-        type=["xlsx"],
-        key="upload_missions"
-    )
+up = st.file_uploader(
+    "📂 Déposer ou sélectionner le fichier des missions",
+    type=["xlsx"],
+    key="upload_missions"
+)
 
-    st.subheader("Logements vacants")
-
-    up_logements = st.file_uploader(
-        "Importer la liste des appartements vacants",
-        type=["csv", "xlsx"],
-        key="upload_logements"
-    )
+up_logements = st.file_uploader(
+    "🏠 Déposer ou sélectionner la liste des appartements vacants",
+    type=["csv", "xlsx"],
+    key="upload_logements"
+)
 
     if up_logements and st.button("🏠 Charger les logements"):
         try:
