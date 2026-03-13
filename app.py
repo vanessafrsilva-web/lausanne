@@ -403,6 +403,7 @@ with t_ai:
                 colonnes_a_supprimer = [
                     "Type exploitation",
                     "date_fifo"
+                    "score"
                 ]
 
                 df_affichage = df_affichage.drop(columns=colonnes_a_supprimer, errors="ignore")
