@@ -73,8 +73,9 @@ if "attributions" not in st.session_state:
 # --- INTERFACE ---
 st.title("📍 Unité Logement : 2.0")
 
-t0, t_attrib, t1, t2, t3 = st.tabs([
+t0, t_reco, t_attrib, t1, t2, t3 = st.tabs([
     "🏠 Logements vacants",
+    "🤖 Recherche intelligente",
     "📝 Attribution logement",
     "📝 Planning Global",
     "📅 Vue par Agent",
