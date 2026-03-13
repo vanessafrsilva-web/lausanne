@@ -131,22 +131,6 @@ def appliquer_styles():
         background-color: white !important;
         color: #1f2c3d !important;
     }
-    /* HEADER TABLEAU */
-[data-testid="stDataFrame"] .gdg-header {
-    background-color: #ffffff !important;
-    color: #000000 !important;
-    font-weight: 600;
-}
-
-/* TEXTE HEADER */
-[data-testid="stDataFrame"] .gdg-header span {
-    color: #000000 !important;
-}
-
-/* LIGNE HEADER */
-[data-testid="stDataFrame"] .gdg-header-row {
-    background-color: #ffffff !important;
-}
 
     /* ===============================
        RADIO / CHECKBOX
@@ -198,6 +182,27 @@ def appliquer_styles():
     [data-testid="stDataEditor"] * {
         color: #1f2c3d !important;
     }
+/* HEADER TABLEAU - dataframe + data editor */
+[data-testid="stDataFrame"] .gdg-header,
+[data-testid="stDataEditor"] .gdg-header,
+[data-testid="stDataFrame"] .gdg-header-row,
+[data-testid="stDataEditor"] .gdg-header-row {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    font-weight: 600 !important;
+}
 
+/* texte header */
+[data-testid="stDataFrame"] .gdg-header *,
+[data-testid="stDataEditor"] .gdg-header * {
+    color: #000000 !important;
+    fill: #000000 !important;
+}
+
+/* cellules normales */
+[data-testid="stDataFrame"] .gdg-cell *,
+[data-testid="stDataEditor"] .gdg-cell * {
+    color: #1f2c3d !important;
+}
     </style>
     """, unsafe_allow_html=True)
