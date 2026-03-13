@@ -30,36 +30,35 @@ st.set_page_config(
     page_icon="📍"
 )
 
-#--Visuel CSS
+# -- Visuel CSS
 st.markdown("""
 <style>
+
 /* Sidebar */
 section[data-testid="stSidebar"] {
-    background-color: #102a43;
+    background-color: #102a43 !important;
 }
 
 section[data-testid="stSidebar"] * {
-    color: white;
+    color: white !important;
 }
 
-/* Conteneur global uploader */
+/* Uploader wrapper */
 section[data-testid="stSidebar"] .stFileUploader {
     background: transparent !important;
-    padding: 0 !important;
     border: none !important;
+    padding: 0 !important;
 }
 
-/* VRAIE zone blanche à recolorer */
-section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] {
+/* Toutes les couches internes du uploader */
+section[data-testid="stSidebar"] .stFileUploader > div,
+section[data-testid="stSidebar"] .stFileUploader > div > div,
+section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"],
+section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] > div,
+section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] > div > div {
     background-color: #1f3b63 !important;
-    border: 2px dashed #2E6BF6 !important;
     border-radius: 12px !important;
-    padding: 18px !important;
-}
-
-/* Contenu interne de la zone */
-section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] > div {
-    background-color: #1f3b63 !important;
+    border: 2px dashed #2E6BF6 !important;
     color: white !important;
 }
 
@@ -68,16 +67,19 @@ section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] * {
     color: white !important;
 }
 
-/* Bouton Browse files */
+/* Bouton browse files */
+section[data-testid="stSidebar"] .stFileUploader button,
 section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] button {
     background-color: #2E6BF6 !important;
     color: white !important;
     border: none !important;
     border-radius: 8px !important;
     opacity: 1 !important;
+    box-shadow: none !important;
 }
 
-/* Hover bouton Browse files */
+/* Hover bouton */
+section[data-testid="stSidebar"] .stFileUploader button:hover,
 section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] button:hover {
     background-color: #1c4ed8 !important;
     color: white !important;
@@ -95,6 +97,7 @@ section[data-testid="stSidebar"] .stButton > button:hover {
     background-color: #1c4ed8 !important;
     color: white !important;
 }
+
 </style>
 """, unsafe_allow_html=True)
 
