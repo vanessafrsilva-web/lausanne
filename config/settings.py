@@ -21,3 +21,6 @@ SECTEURS = {
     'Tunnel': ['Tunnel'],
     'Oron': ['Oron']
 }
+
+
+COULEURS = {"Celine": "#d1e9ff", "Maria Claret": "#ffdae0", "Maria Elisabeth": "#d4f8d4", "⚠️ SANS AGENT": "#eeeeee"}
