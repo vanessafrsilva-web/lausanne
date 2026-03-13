@@ -307,22 +307,19 @@ with t_ai:
                 ["Tous"] + sorted(df_log["Type objet"].dropna().astype(str).unique().tolist()),
                 key="ai_type_objet"
             )
+loyer_min = st.number_input(
+    "Loyer minimum",
+    min_value=0.0,
+    step=50.0,
+    key="ai_loyer_min"
+)
 
-            loyer_min = st.number_input(
-                "Loyer minimum",
-                min_value=0.0,
-                value=0.0,
-                step=50.0,
-                key="ai_loyer_min"
-            )
-
-            loyer_max = st.number_input(
-                "Loyer maximum",
-                min_value=0.0,
-                value=700.0,
-                step=50.0,
-                key="ai_loyer_max"
-            )
+loyer_max = st.number_input(
+    "Loyer maximum",
+    min_value=0.0,
+    step=50.0,
+    key="ai_loyer_max"
+)
 
         with col2:
             parking = st.radio("Parking", ["Non", "Oui"], key="ai_parking")
