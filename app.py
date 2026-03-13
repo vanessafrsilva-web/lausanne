@@ -386,24 +386,35 @@ with t_ai:
                 resultats = recommander_logements(df_log, criteres, top_n=3)
                 st.session_state["ai_resultats_df"] = resultats.copy()
 
-        with colB:
-            st.button(
-                "♻️ Reset recherche",
-                key="ai_reset",
-                on_click=reset_recherche_ia
-            )
+with colB:
+    st.button(
+        "♻️ Reset recherche",
+        key="ai_reset",
+        on_click=reset_recherche_ia
+    )
 
-        if "ai_resultats_df" in st.session_state:
-            if st.session_state["ai_resultats_df"].empty:
-                st.warning("Aucun logement correspondant.")
-            else:
-                st.success("Voici les meilleurs logements proposés :")
-                st.data_editor(
-                    st.session_state["ai_resultats_df"],
-                    use_container_width=True,
-                    disabled=True,
-                    key="ai_resultats"
-                )
+if "ai_resultats_df" in st.session_state:
+    if st.session_state["ai_resultats_df"].empty:
+        st.warning("Aucun logement correspondant.")
+    else:
+        st.success("Voici les meilleurs logements proposés :")
+
+        df_affichage = st.session_state["ai_resultats_df"].copy()
+
+        colonnes_a_supprimer = [
+            "Type exploitation",
+            "date_fifo"
+        ]
+
+        df_affichage = df_affichage.drop(columns=colonnes_a_supprimer, errors="ignore")
+
+        st.data_editor(
+            df_affichage,
+            use_container_width=True,
+            disabled=True,
+            key="ai_resultats"
+        )
+
 
     else:
         st.info("Charge d'abord la liste des logements vacants dans la sidebar.")
