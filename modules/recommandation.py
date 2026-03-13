@@ -144,6 +144,7 @@ def recommander_logements(df_logements, criteres, top_n=3):
 
     df = df.copy()
     df["score"] = 0.0
+    df["pertinence"] = (df["score"] / 5 * 100).round(0)
 
     loyer_col = col_loyer(df)
     if loyer_col:
