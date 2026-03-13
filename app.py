@@ -36,7 +36,13 @@ t1, t2, t3 = st.tabs(["📝 Planning Global", "📅 Vue par Agent", "📊 Rappor
 with st.sidebar:
     st.header("📂 Importation")
     up = st.file_uploader("Fichier Excel des missions", type=['xlsx'])
-    
+    st.subheader("Logements vacants")
+
+up_logements = st.file_uploader(
+    "Importer la liste des appartements vacants",
+    type=["csv", "xlsx"],
+    key="logements"
+)
     if up and st.button("🚀 Lancer l'Attribution"):
         try:
             df_ex = pd.read_excel(up).dropna(how='all').fillna('')
