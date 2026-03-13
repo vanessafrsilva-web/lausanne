@@ -3,9 +3,9 @@ import pandas as pd
 from datetime import datetime
 import io
 import plotly.express as px
+
 from ui.styles import appliquer_styles
 from modules.recommandation import recommander_logements
-
 from modules.data_loader import charger_logements
 from config.settings import (
     AGENTS,
@@ -15,10 +15,10 @@ from config.settings import (
     INFOS_BATIMENTS,
     SECTEURS
 )
-
 from modules.distance import calculer_distance
 from modules.calendar import generer_ics
 from modules.scheduler import calculer_creneau
+
 
 def reset_recherche_ia():
     st.session_state["ai_ville"] = "Toutes"
@@ -31,7 +31,8 @@ def reset_recherche_ia():
     st.session_state["ai_accompagne_plus_2"] = "Non"
     st.session_state["ai_demande"] = ""
     st.session_state["ai_resultats_df"] = pd.DataFrame()
-    
+
+
 @st.cache_data
 def charger_excel(file):
     return pd.read_excel(file)
@@ -84,7 +85,7 @@ if "ai_demande" not in st.session_state:
 
 if "ai_resultats_df" not in st.session_state:
     st.session_state.ai_resultats_df = pd.DataFrame()
-    
+
 if "db" not in st.session_state:
     st.session_state.db = pd.DataFrame(
         columns=["ID", "Batiment", "Date", "Heure", "Agent", "Rue", "Type", "Statut", "Date_Sort"]
@@ -243,6 +244,7 @@ with st.sidebar:
             "Salaire",
             "Ancien locataire"
         ])
+        reset_recherche_ia()
         st.rerun()
 
 
@@ -314,10 +316,11 @@ with t0:
                 .reset_index()
             )
             repartition.columns = ["Adresse", "Nombre de logements"]
-            st.dataframe(repartition, use_container_width=True, key="vacants_repartition")
+            st.dataframe(repartition, use_container_width=True)
 
     else:
         st.info("Aucune liste de logements chargée.")
+
 
 # --- ONGLET IA ---
 with t_ai:
@@ -337,19 +340,20 @@ with t_ai:
                 ["Tous"] + sorted(df_log["Type objet"].dropna().astype(str).unique().tolist()),
                 key="ai_type_objet"
             )
-loyer_min = st.number_input(
-    "Loyer minimum",
-    min_value=0.0,
-    step=50.0,
-    key="ai_loyer_min"
-)
 
-loyer_max = st.number_input(
-    "Loyer maximum",
-    min_value=0.0,
-    step=50.0,
-    key="ai_loyer_max"
-)
+            loyer_min = st.number_input(
+                "Loyer minimum",
+                min_value=0.0,
+                step=50.0,
+                key="ai_loyer_min"
+            )
+
+            loyer_max = st.number_input(
+                "Loyer maximum",
+                min_value=0.0,
+                step=50.0,
+                key="ai_loyer_max"
+            )
 
         with col2:
             parking = st.radio("Parking", ["Non", "Oui"], key="ai_parking")
@@ -363,32 +367,31 @@ loyer_max = st.number_input(
             key="ai_demande"
         )
 
-colA, colB = st.columns(2)
+        colA, colB = st.columns(2)
 
-with colA:
-    if st.button("🔎 Chercher les meilleurs logements", key="ai_btn_recherche"):
+        with colA:
+            if st.button("🔎 Chercher les meilleurs logements", key="ai_btn_recherche"):
+                criteres = {
+                    "ville": ville,
+                    "type_objet": type_objet,
+                    "loyer_min": loyer_min,
+                    "loyer_max": loyer_max,
+                    "parking": parking,
+                    "piquet": piquet,
+                    "accompagne_2": accompagne_2,
+                    "accompagne_plus_2": accompagne_plus_2,
+                    "mot_cle": demande
+                }
 
-        criteres = {
-            "ville": ville,
-            "type_objet": type_objet,
-            "loyer_min": loyer_min,
-            "loyer_max": loyer_max,
-            "parking": parking,
-            "piquet": piquet,
-            "accompagne_2": accompagne_2,
-            "accompagne_plus_2": accompagne_plus_2,
-            "mot_cle": demande
-        }
+                resultats = recommander_logements(df_log, criteres, top_n=3)
+                st.session_state["ai_resultats_df"] = resultats.copy()
 
-        resultats = recommander_logements(df_log, criteres, top_n=3)
-        st.session_state["ai_resultats_df"] = resultats.copy()
-
-with colB:
-    st.button(
-        "♻️ Reset recherche",
-        key="ai_reset",
-        on_click=reset_recherche_ia
-    )
+        with colB:
+            st.button(
+                "♻️ Reset recherche",
+                key="ai_reset",
+                on_click=reset_recherche_ia
+            )
 
         if "ai_resultats_df" in st.session_state:
             if st.session_state["ai_resultats_df"].empty:
@@ -404,6 +407,7 @@ with colB:
 
     else:
         st.info("Charge d'abord la liste des logements vacants dans la sidebar.")
+
 
 # --- ONGLET ATTRIBUTION ---
 with t_attrib:
@@ -480,7 +484,7 @@ with t_attrib:
             st.success("Attribution enregistrée avec succès.")
 
         st.markdown("### 📋 Attributions enregistrées")
-        st.dataframe(st.session_state.attributions, use_container_width=True, key="attrib_tableau")
+        st.dataframe(st.session_state.attributions, use_container_width=True)
 
     else:
         st.warning("Charge d'abord la liste des logements vacants dans la sidebar.")
