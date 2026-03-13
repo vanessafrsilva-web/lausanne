@@ -295,24 +295,25 @@ with t0:
 
             df_filtre = df_filtre[masque]
 
-        # Indicateurs
-        c1, c2 = st.columns(2)
-        c1.metric("Logements trouvés", len(df_filtre))
-        c2.metric("Immeubles distincts", df_filtre["Adresse"].nunique())
+
+# Indicateurs
+c1, c2 = st.columns(2)
+c1.metric("Logements trouvés", len(df_filtre))
+c2.metric("Immeubles distincts", df_filtre["Adresse"].nunique())
+
 # Tableau des logements
 st.dataframe(df_filtre, use_container_width=True)
 
-        # Répartition par immeuble
-        if "Adresse" in df_filtre.columns:
-            st.markdown("### 📊 Répartition par immeuble")
-            repartition = (
-                df_filtre["Adresse"]
-                .value_counts()
-                .reset_index()
-            )
-            repartition.columns = ["Adresse", "Nombre de logements"]
-            st.dataframe(repartition, use_container_width=True)
-
+# Répartition par immeuble
+if "Adresse" in df_filtre.columns:
+    st.markdown("### 📊 Répartition par immeuble")
+    repartition = (
+        df_filtre["Adresse"]
+        .value_counts()
+        .reset_index()
+    )
+    repartition.columns = ["Adresse", "Nombre de logements"]
+    st.dataframe(repartition, use_container_width=True)
 
 # --- ONGLETS PLANNING / RAPPORTS ---
 if not st.session_state.db.empty:
