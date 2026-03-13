@@ -290,7 +290,14 @@ with t_ai:
             )
 
         with col2:
-            budget = st.number_input("Budget maximum", 0.0, 5000.0, 1500.0, key="ai_budget")
+      
+    loyer_min = st.number_input("Loyer minimum", min_value=0.0, value=0.0, step=50.0, key="ai_loyer_min")
+    loyer_max = st.number_input("Loyer maximum", min_value=0.0, value=700.0, step=50.0, key="ai_loyer_max")
+
+    parking = st.radio("Parking", ["Non", "Oui"], key="ai_parking")
+    piquet = st.radio("Piquet", ["Non", "Oui"], key="ai_piquet")
+    accompagne_2 = st.radio("Accompagné à 2 personnes", ["Non", "Oui"], key="ai_accompagne_2")
+    accompagne_plus_2 = st.radio("Accompagné à plus de 2 personnes", ["Non", "Oui"], key="ai_accompagne_plus_2")
 
         demande = st.text_area(
             "Demande utilisateur",
@@ -299,11 +306,18 @@ with t_ai:
         )
 
         if st.button("🔎 Chercher les meilleurs logements", key="ai_btn_recherche"):
-            criteres = {
-                "ville": ville,
-                "type_objet": type_objet,
-                "budget_max": budget,
-                "mot_cle": demande
+           
+               criteres = {
+    "ville": ville,
+    "type_objet": type_objet,
+    "loyer_min": loyer_min,
+    "loyer_max": loyer_max,
+    "parking": parking,
+    "piquet": piquet,
+    "accompagne_2": accompagne_2,
+    "accompagne_plus_2": accompagne_plus_2,
+    "mot_cle": demande
+
             }
 
             resultats = recommander_logements(df_log, criteres)
