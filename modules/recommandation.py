@@ -144,7 +144,6 @@ def recommander_logements(df_logements, criteres, top_n=3):
 
     df = df.copy()
     df["score"] = 0.0
-    df["pertinence"] = (df["score"] / 5 * 100).round(0)
 
     loyer_col = col_loyer(df)
     if loyer_col:
@@ -165,6 +164,13 @@ def recommander_logements(df_logements, criteres, top_n=3):
 
     if exclure_tunnel:
         df["score"] += 1
+
+    # Convertir le score en pourcentage
+    score_max = df["score"].max() if not df.empty else 0
+    if score_max > 0:
+        df["Pertinence (%)"] = ((df["score"] / score_max) * 100).round(0).astype(int)
+    else:
+        df["Pertinence (%)"] = 0
 
     # FIFO : plus ancienne date de dernière location d'abord
     if "Date de la dernière location" in df.columns:
