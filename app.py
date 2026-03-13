@@ -62,7 +62,7 @@ section[data-testid="stSidebar"] .stButton > button {
 }
 
 section[data-testid="stSidebar"] .stButton > button:hover {
-    background-color: #fffff;
+    background-color: #ffffff;
     color: white;
 }
 
