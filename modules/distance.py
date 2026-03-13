@@ -1,3 +1,5 @@
+import numpy as np
+
 def calculer_distance(pos1, pos2):
     if not pos1 or not pos2: return 0
     R = 6371.0
