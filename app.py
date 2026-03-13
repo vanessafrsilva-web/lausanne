@@ -58,6 +58,29 @@ section[data-testid="stSidebar"] .stButton>button {
 
 </style>
 """, unsafe_allow_html=True)
+st.markdown("""
+<style>
+
+/* bouton Browse files */
+section[data-testid="stSidebar"] button[kind="secondary"] {
+    background-color: #ffffff !important;
+    color: #102a43 !important;
+    border-radius: 6px;
+    border: none;
+}
+
+/* texte uploader */
+section[data-testid="stSidebar"] .stFileUploader label {
+    color: white;
+}
+
+/* bordure zone upload */
+section[data-testid="stSidebar"] .stFileUploader > div {
+    border: 1px solid #2E6BF6;
+}
+
+</style>
+""", unsafe_allow_html=True)
 
 # --- FONCTIONS TECHNIQUES ---
 def trouver_secteur(batiment):
