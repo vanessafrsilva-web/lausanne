@@ -31,7 +31,6 @@ st.set_page_config(
 )
 
 # -- Visuel CSS
-# -- Visuel CSS
 st.markdown("""
 <style>
 
@@ -69,13 +68,13 @@ section[data-testid="stSidebar"] [data-testid="stFileUploader"] {
     border: 1px solid #dbe3f1;
     border-radius: 10px;
     padding: 12px;
-    background-color: #ffffff;
+    background-color: #fffff;
 }
 
 /* bouton sidebar */
 section[data-testid="stSidebar"] .stButton > button {
     background-color: #b45f06;
-    color: white;
+    color: #fffff;
     border-radius: 8px;
     border: none;
 }
