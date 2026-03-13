@@ -6,3 +6,40 @@ backgroundColor="#f6f8fb"
 secondaryBackgroundColor="#102a43"
 textColor="#1b1b1b"
 font="sans serif"
+
+
+st.markdown("""
+<style>
+
+/* Sidebar background */
+section[data-testid="stSidebar"] {
+    background-color: #102a43;
+}
+
+/* Texte sidebar */
+section[data-testid="stSidebar"] * {
+    color: white;
+}
+
+/* File uploader */
+section[data-testid="stSidebar"] .stFileUploader {
+    background-color: #1f3b63;
+    padding: 10px;
+    border-radius: 8px;
+}
+
+/* Boutons sidebar */
+section[data-testid="stSidebar"] .stButton>button {
+    background-color: #2E6BF6;
+    color: white;
+    border-radius: 8px;
+    border: none;
+}
+
+/* Reset button */
+section[data-testid="stSidebar"] .stButton>button:hover {
+    background-color: #1c4ed8;
+}
+
+</style>
+""", unsafe_allow_html=True)
