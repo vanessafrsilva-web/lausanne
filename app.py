@@ -20,7 +20,18 @@ from modules.distance import calculer_distance
 from modules.calendar import generer_ics
 from modules.scheduler import calculer_creneau
 
-
+def reset_recherche_ia():
+    st.session_state["ai_ville"] = "Toutes"
+    st.session_state["ai_type_objet"] = "Tous"
+    st.session_state["ai_loyer_min"] = 0.0
+    st.session_state["ai_loyer_max"] = 700.0
+    st.session_state["ai_parking"] = "Non"
+    st.session_state["ai_piquet"] = "Non"
+    st.session_state["ai_accompagne_2"] = "Non"
+    st.session_state["ai_accompagne_plus_2"] = "Non"
+    st.session_state["ai_demande"] = ""
+    st.session_state["ai_resultats_df"] = pd.DataFrame()
+    
 @st.cache_data
 def charger_excel(file):
     return pd.read_excel(file)
@@ -278,8 +289,7 @@ with t0:
     else:
         st.info("Aucune liste de logements chargée.")
 
-
-# --- ONGLET IA ---
+reset_recherche_ia():
 # --- ONGLET IA ---
 with t_ai:
     st.subheader("🤖 Recherche intelligente de logements")
