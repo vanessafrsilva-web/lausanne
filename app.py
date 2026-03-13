@@ -29,51 +29,67 @@ st.set_page_config(
     layout="wide",
     page_icon="📍"
 )
+
+#--Visuelle CSS
 st.markdown("""
 <style>
 
-/* Sidebar background */
+/* Sidebar */
 section[data-testid="stSidebar"] {
     background-color: #102a43;
 }
 
-/* Texte sidebar */
 section[data-testid="stSidebar"] * {
     color: white;
 }
 
-/* zone upload */
+/* Zone uploader */
 section[data-testid="stSidebar"] .stFileUploader {
     background-color: #1f3b63;
     padding: 12px;
     border-radius: 10px;
 }
 
-/* bouton Browse files */
+/* Bloc interne uploader */
+section[data-testid="stSidebar"] .stFileUploader > div {
+    background-color: #1f3b63 !important;
+    border: 1px solid #2E6BF6 !important;
+    border-radius: 10px;
+}
+
+/* Bouton Browse files */
 section[data-testid="stSidebar"] .stFileUploader button {
-    background-color: white !important;
+    background: #ffffff !important;
     color: #102a43 !important;
-    border-radius: 6px;
-    border: none;
-    font-weight: 600;
+    border: 1px solid #d0d7e2 !important;
+    border-radius: 8px !important;
+    opacity: 1 !important;
+    font-weight: 600 !important;
 }
 
-/* hover bouton */
+/* Texte du bouton */
+section[data-testid="stSidebar"] .stFileUploader button * {
+    color: #102a43 !important;
+    opacity: 1 !important;
+}
+
+/* Hover */
 section[data-testid="stSidebar"] .stFileUploader button:hover {
-    background-color: #e6eef8 !important;
+    background: #eef4ff !important;
+    color: #102a43 !important;
 }
 
-/* bouton reset */
+/* Boutons normaux sidebar */
 section[data-testid="stSidebar"] .stButton > button {
-    background-color: #2E6BF6;
-    color: white;
-    border-radius: 8px;
-    border: none;
+    background-color: #2E6BF6 !important;
+    color: white !important;
+    border-radius: 8px !important;
+    border: none !important;
 }
 
-/* hover reset */
 section[data-testid="stSidebar"] .stButton > button:hover {
-    background-color: #1c4ed8;
+    background-color: #1c4ed8 !important;
+    color: white !important;
 }
 
 </style>
