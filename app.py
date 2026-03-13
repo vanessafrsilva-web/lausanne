@@ -47,6 +47,22 @@ section[data-testid="stSidebar"] [data-testid="stFileUploader"] {
     background-color: #8dafe0;
     border: 1px solid #d9e3f0;
 }
+/* bouton Browse files */
+[data-testid="stFileUploader"] button {
+    background-color: #1f4e79 !important;
+    color: white !important;
+    border-radius: 8px !important;
+    border: none !important;
+}
+
+/* hover */
+[data-testid="stFileUploader"] button:hover {
+    background-color: #2e6aa6 !important;
+    color: white !important;
+}
+[data-testid="stFileUploaderDropzone"] {
+    border-radius: 12px !important;
+}
 
 /* Boutons sidebar */
 section[data-testid="stSidebar"] .stButton > button {
