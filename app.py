@@ -33,6 +33,26 @@ def reset_recherche_ia():
     st.session_state["ai_demande"] = ""
     st.session_state["ai_resultats_df"] = pd.DataFrame()
 
+def sauvegarder_data():
+    os.makedirs("data", exist_ok=True)
+
+    st.session_state.logements.to_pickle("data/logements.pkl")
+    st.session_state.db.to_pickle("data/planning.pkl")
+    st.session_state.attributions.to_pickle("data/attributions.pkl")
+
+
+def charger_data_sauvegardee():
+    os.makedirs("data", exist_ok=True)
+
+    if os.path.exists("data/logements.pkl"):
+        st.session_state.logements = pd.read_pickle("data/logements.pkl")
+
+    if os.path.exists("data/planning.pkl"):
+        st.session_state.db = pd.read_pickle("data/planning.pkl")
+
+    if os.path.exists("data/attributions.pkl"):
+        st.session_state.attributions = pd.read_pickle("data/attributions.pkl")
+        
 
 @st.cache_data
 def charger_excel(file):
