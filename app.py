@@ -33,9 +33,9 @@ def reset_recherche_ia():
     st.session_state["ai_demande"] = ""
     st.session_state["ai_resultats_df"] = pd.DataFrame()
 
+
 def sauvegarder_data():
     os.makedirs("data", exist_ok=True)
-
     st.session_state.logements.to_pickle("data/logements.pkl")
     st.session_state.db.to_pickle("data/planning.pkl")
     st.session_state.attributions.to_pickle("data/attributions.pkl")
@@ -52,7 +52,7 @@ def charger_data_sauvegardee():
 
     if os.path.exists("data/attributions.pkl"):
         st.session_state.attributions = pd.read_pickle("data/attributions.pkl")
-        
+
 
 @st.cache_data
 def charger_excel(file):
@@ -134,7 +134,10 @@ if "attributions" not in st.session_state:
         "Ancien locataire"
     ])
 
+# Recharge les données sauvegardées
 charger_data_sauvegardee()
+
+
 # --- INTERFACE ---
 st.title("📍 Unité Logement : 2.0")
 
@@ -172,6 +175,7 @@ with st.sidebar:
         try:
             df_logements = charger_logements(up_logements)
             st.session_state.logements = df_logements
+            sauvegarder_data()
             st.success("Liste des logements chargée")
         except Exception as e:
             st.error(f"Erreur logements : {e}")
@@ -238,6 +242,7 @@ with st.sidebar:
                         })
 
             st.session_state.db = pd.DataFrame(temp_rows)
+            sauvegarder_data()
             st.rerun()
 
         except Exception as e:
@@ -266,6 +271,7 @@ with st.sidebar:
             "Ancien locataire"
         ])
         reset_recherche_ia()
+        sauvegarder_data()
         st.rerun()
 
 
@@ -406,6 +412,7 @@ with t_ai:
 
                 resultats = recommander_logements(df_log, criteres, top_n=3)
                 st.session_state["ai_resultats_df"] = resultats.copy()
+
         with colB:
             st.button(
                 "♻️ Reset recherche",
@@ -427,7 +434,10 @@ with t_ai:
                     "score"
                 ]
 
-                df_affichage = df_affichage.drop(columns=colonnes_a_supprimer, errors="ignore")
+                df_affichage = df_affichage.drop(
+                    columns=colonnes_a_supprimer,
+                    errors="ignore"
+                )
 
                 st.data_editor(
                     df_affichage,
@@ -435,6 +445,8 @@ with t_ai:
                     disabled=True,
                     key="ai_resultats"
                 )
+    else:
+        st.info("Charge d'abord la liste des logements vacants dans la sidebar.")
 
 
 # --- ONGLET ATTRIBUTION ---
@@ -509,6 +521,7 @@ with t_attrib:
                 ignore_index=True
             )
 
+            sauvegarder_data()
             st.success("Attribution enregistrée avec succès.")
 
         st.markdown("### 📋 Attributions enregistrées")
