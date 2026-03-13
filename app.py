@@ -30,11 +30,9 @@ st.set_page_config(
     page_icon="📍"
 )
 
-#--Visuelle CSS
-# --- CSS visuel ---
+#--Visuel CSS
 st.markdown("""
 <style>
-
 /* Sidebar */
 section[data-testid="stSidebar"] {
     background-color: #102a43;
@@ -44,42 +42,48 @@ section[data-testid="stSidebar"] * {
     color: white;
 }
 
-/* Zone upload */
+/* Conteneur global uploader */
 section[data-testid="stSidebar"] .stFileUploader {
-    background-color: #1f3b63;
-    padding: 14px;
-    border-radius: 12px;
-    border: 1px solid #2E6BF6;
-}
-
-/* Zone interne upload */
-section[data-testid="stSidebar"] .stFileUploader > div {
-    background-color: #1f3b63 !important;
-    border-radius: 10px !important;
-}
-
-/* Zone drag & drop */
-section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] {
-    background-color: #1f3b63 !important;
-}
-
-/* Texte uploader */
-section[data-testid="stSidebar"] .stFileUploader label,
-section[data-testid="stSidebar"] .stFileUploader span,
-section[data-testid="stSidebar"] .stFileUploader small {
-    color: white !important;
-}
-
-/* Cache le bouton "Browse files" */
-section[data-testid="stSidebar"] .stFileUploader button {
-    opacity: 0 !important;
-    height: 0 !important;
+    background: transparent !important;
     padding: 0 !important;
-    margin: 0 !important;
     border: none !important;
 }
 
-/* Boutons sidebar */
+/* VRAIE zone blanche à recolorer */
+section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] {
+    background-color: #1f3b63 !important;
+    border: 2px dashed #2E6BF6 !important;
+    border-radius: 12px !important;
+    padding: 18px !important;
+}
+
+/* Contenu interne de la zone */
+section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] > div {
+    background-color: #1f3b63 !important;
+    color: white !important;
+}
+
+/* Texte dans la zone */
+section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] * {
+    color: white !important;
+}
+
+/* Bouton Browse files */
+section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] button {
+    background-color: #2E6BF6 !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 8px !important;
+    opacity: 1 !important;
+}
+
+/* Hover bouton Browse files */
+section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] button:hover {
+    background-color: #1c4ed8 !important;
+    color: white !important;
+}
+
+/* Boutons classiques sidebar */
 section[data-testid="stSidebar"] .stButton > button {
     background-color: #2E6BF6 !important;
     color: white !important;
@@ -89,8 +93,8 @@ section[data-testid="stSidebar"] .stButton > button {
 
 section[data-testid="stSidebar"] .stButton > button:hover {
     background-color: #1c4ed8 !important;
+    color: white !important;
 }
-
 </style>
 """, unsafe_allow_html=True)
 
