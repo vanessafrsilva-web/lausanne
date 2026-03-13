@@ -29,6 +29,34 @@ st.set_page_config(
     layout="wide",
     page_icon="📍"
 )
+st.markdown(
+    """
+    <style>
+    section[data-testid="stSidebar"] {
+        background-color: #0b2c5f;
+    }
+
+    section[data-testid="stSidebar"] * {
+        color: white;
+    }
+
+    section[data-testid="stSidebar"] label {
+        color: white;
+    }
+
+    section[data-testid="stSidebar"] .stButton>button {
+        background-color: #1f4fa3;
+        color: white;
+        border-radius: 6px;
+    }
+
+    section[data-testid="stSidebar"] .stFileUploader {
+        color: white;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
 
 # --- FONCTIONS TECHNIQUES ---
