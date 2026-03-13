@@ -1,3 +1,4 @@
+from config.settings import AGENTS, BUREAU_ADRESSE, BUREAU_GPS, COULEURS
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
@@ -5,10 +6,7 @@ import io
 import plotly.express as px
 import numpy as np
 
-# --- CONFIGURATION ---
-BUREAU_ADRESSE = "Chemin Mont-Paisible 18, 1011 Lausanne"
-BUREAU_GPS = (46.5332, 6.6135) 
-AGENTS = ["Celine", "Maria Claret", "Maria Elisabeth"]
+
 
 INFOS_BATIMENTS = {
     'Bethusy A': {'rue': 'Avenue de Béthusy 54, Lausanne', 'lat': 46.5225, 'lon': 6.6472},
