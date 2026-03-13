@@ -25,7 +25,7 @@ def charger_excel(file):
 
 
 st.set_page_config(
-    page_title="Unité Logement - Gestion Planning",
+    page_title="Unité Logement - 2.0",
     layout="wide",
     page_icon="📍"
 )
@@ -237,6 +237,12 @@ with t0:
     if not st.session_state.logements.empty:
         df_log = st.session_state.logements.copy()
 
+        # Recherche rapide
+        recherche = st.text_input(
+            "🔎 Recherche rapide",
+            placeholder="Ex: Lausanne, Montolieu, V01934, Habitat..."
+        )
+
         col1, col2, col3 = st.columns(3)
 
         with col1:
@@ -262,12 +268,45 @@ with t0:
         if type_objet_sel != "Tous":
             df_filtre = df_filtre[df_filtre["Type objet"].astype(str) == type_objet_sel]
 
-        st.metric("Logements trouvés", len(df_filtre))
+        # Recherche rapide sur plusieurs colonnes
+        if recherche:
+            recherche = recherche.lower()
+            colonnes_recherche = ["Ville", "Adresse", "Type objet", "Référence interne", "Numéro unique"]
+
+            masque = False
+            for col in colonnes_recherche:
+                if col in df_filtre.columns:
+                    masque = masque | df_filtre[col].astype(str).str.lower().str.contains(recherche, na=False)
+
+            df_filtre = df_filtre[masque]
+
+        # Indicateurs
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Logements trouvés", len(df_filtre))
+        c2.metric("Immeubles distincts", df_filtre["Adresse"].nunique() if "Adresse" in df_filtre.columns else 0)
+
+        if "Adresse" in df_filtre.columns and not df_filtre.empty:
+            top_immeuble = df_filtre["Adresse"].value_counts().idxmax()
+            top_count = df_filtre["Adresse"].value_counts().max()
+            c3.metric("Immeuble le plus représenté", f"{top_count}", help=top_immeuble)
+        else:
+            c3.metric("Immeuble le plus représenté", "0")
+
         st.dataframe(df_filtre, use_container_width=True)
+
+        # Indicateur détaillé par bâtiment
+        if "Adresse" in df_filtre.columns:
+            st.markdown("### 📊 Répartition par immeuble")
+            repartition = (
+                df_filtre["Adresse"]
+                .value_counts()
+                .reset_index()
+            )
+            repartition.columns = ["Adresse", "Nombre de logements"]
+            st.dataframe(repartition, use_container_width=True)
 
     else:
         st.info("Aucune liste de logements chargée.")
-
 
 # --- ONGLETS PLANNING / RAPPORTS ---
 if not st.session_state.db.empty:
