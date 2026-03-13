@@ -1,7 +1,5 @@
-streamlit==1.31.0
+streamlit
 pandas
-openpyxl
-xlsxwriter
-altair
-plotly
 numpy
+plotly
+openpyxl
