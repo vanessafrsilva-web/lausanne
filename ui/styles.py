@@ -8,19 +8,17 @@ def appliquer_styles():
     /* ===============================
        SIDEBAR
     =============================== */
-
     section[data-testid="stSidebar"] {
         background-color: #073763;
     }
 
     section[data-testid="stSidebar"] * {
-        color: white;
+        color: white !important;
     }
 
-    /* boutons sidebar */
     section[data-testid="stSidebar"] .stButton > button {
         background-color: #1f4e79;
-        color: white;
+        color: white !important;
         border-radius: 8px;
         border: none;
         padding: 6px 14px;
@@ -28,30 +26,32 @@ def appliquer_styles():
 
     section[data-testid="stSidebar"] .stButton > button:hover {
         background-color: #2e6aa6;
+        color: white !important;
     }
 
-    /* ===============================
-       FILE UPLOADER
-    =============================== */
-
+    /* File uploader */
     [data-testid="stFileUploader"] {
-        background-color: #1f4e79;
+        background-color: #2a5d91;
         padding: 10px;
-        border-radius: 10px;
+        border-radius: 12px;
         border: none;
     }
 
     [data-testid="stFileUploader"] button {
         background-color: white !important;
         color: #073763 !important;
-        border-radius: 6px;
+        border-radius: 8px;
         border: none;
+    }
+
+    [data-testid="stFileUploader"] button:hover {
+        background-color: #eaf2fb !important;
+        color: #073763 !important;
     }
 
     /* ===============================
        FOND PRINCIPAL
     =============================== */
-
     [data-testid="stAppViewContainer"] {
         background-color: #f5f7fb;
     }
@@ -61,43 +61,88 @@ def appliquer_styles():
     }
 
     /* ===============================
-       TITRES
+       TEXTE PRINCIPAL
     =============================== */
-
-    h1 {
-        color: #073763;
-        font-weight: 700;
+    .block-container,
+    .block-container p,
+    .block-container label,
+    .block-container div,
+    .block-container span {
+        color: #1f2c3d;
     }
 
-    h2, h3, h4 {
-        color: #1f2c3d;
+    h1, h2, h3, h4 {
+        color: #073763 !important;
+    }
+
+    /* Caption / petit texte */
+    [data-testid="stCaptionContainer"] {
+        color: #5b6575 !important;
+    }
+
+    /* Alertes info/success/warning */
+    [data-testid="stAlertContainer"] * {
+        color: #1f2c3d !important;
+    }
+
+    /* ===============================
+       TABS
+    =============================== */
+    button[data-baseweb="tab"] {
+        color: #1f2c3d !important;
+        font-size: 15px;
+    }
+
+    button[data-baseweb="tab"][aria-selected="true"] {
+        color: #073763 !important;
+        border-bottom: 3px solid #073763 !important;
+        font-weight: 600;
     }
 
     /* ===============================
        INPUTS
     =============================== */
-
     .stTextInput input,
     .stNumberInput input,
     .stTextArea textarea {
+        background-color: white !important;
+        color: #1f2c3d !important;
         border-radius: 8px;
         border: 1px solid #dbe3f1;
         padding: 6px;
     }
 
+    .stTextInput input::placeholder,
+    .stTextArea textarea::placeholder {
+        color: #7a8699 !important;
+    }
+
     /* ===============================
        SELECTBOX
     =============================== */
-
     .stSelectbox div[data-baseweb="select"] > div {
+        background-color: white !important;
+        color: #1f2c3d !important;
         border-radius: 8px;
         border: 1px solid #dbe3f1;
+    }
+
+    div[role="listbox"] {
+        background-color: white !important;
+        color: #1f2c3d !important;
+    }
+
+    /* ===============================
+       RADIO / CHECKBOX
+    =============================== */
+    .stRadio label,
+    .stCheckbox label {
+        color: #1f2c3d !important;
     }
 
     /* ===============================
        METRICS
     =============================== */
-
     [data-testid="metric-container"] {
         background-color: white;
         border-radius: 10px;
@@ -106,10 +151,13 @@ def appliquer_styles():
         box-shadow: 0 2px 8px rgba(0,0,0,0.05);
     }
 
-    /* ===============================
-       TABLEAUX
-    =============================== */
+    [data-testid="metric-container"] * {
+        color: #073763 !important;
+    }
 
+    /* ===============================
+       DATAFRAME / TABLE
+    =============================== */
     [data-testid="stDataFrame"] {
         background-color: white !important;
         border-radius: 12px;
@@ -118,24 +166,21 @@ def appliquer_styles():
         overflow: hidden;
     }
 
-    /* texte cellules */
-    [data-testid="stDataFrame"] span {
+    [data-testid="stDataFrame"] * {
         color: #1f2c3d !important;
     }
 
     /* ===============================
-       TABS
+       DATA EDITOR
     =============================== */
-
-    button[data-baseweb="tab"] {
-        font-size: 15px;
-        color: #1f2c3d;
+    [data-testid="stDataEditor"] {
+        background-color: white !important;
+        border-radius: 12px;
+        border: 1px solid #dbe3f1;
     }
 
-    button[data-baseweb="tab"][aria-selected="true"] {
-        border-bottom: 3px solid #073763 !important;
-        color: #073763;
-        font-weight: 600;
+    [data-testid="stDataEditor"] * {
+        color: #1f2c3d !important;
     }
 
     </style>
