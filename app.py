@@ -6,6 +6,7 @@ import io
 import plotly.express as px
 import numpy as np
 from config.settings import (AGENTS, BUREAU_ADRESSE, BUREAU_GPS, COULEURS,   INFOS_BATIMENTS,   SECTEURS)
+from modules.distance import calculer_distance
 
 st.set_page_config(page_title="Unité Logement - Gestion Planning", layout="wide", page_icon="📍")
 
