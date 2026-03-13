@@ -253,7 +253,7 @@ with t0:
         c1.metric("Logements trouvés", len(df_filtre))
         c2.metric("Immeubles distincts", df_filtre["Adresse"].nunique())
 
-        st.dataframe(df_filtre, use_container_width=True)
+st.data_editor(df_filtre, use_container_width=True, disabled=True)
 
         if "Adresse" in df_filtre.columns:
             st.markdown("### 📊 Répartition par immeuble")
