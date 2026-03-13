@@ -65,7 +65,7 @@ section[data-testid="stSidebar"] * {
 
 /* uploader sidebar */
 section[data-testid="stSidebar"] [data-testid="stFileUploader"] {
-    border: 1px solid #dbe3f1;
+    border: 1px solid #073763;
     border-radius: 10px;
     padding: 12px;
     background-color: #fffff;
@@ -80,7 +80,7 @@ section[data-testid="stSidebar"] .stButton > button {
 }
 
 section[data-testid="stSidebar"] .stButton > button:hover {
-    background-color: #ea9999;
+    background-color: #0b5394;
 }
 
 </style>
