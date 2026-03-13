@@ -26,42 +26,27 @@ def recommander_logements(df_logements, criteres, top_n=3):
 
     demande = str(criteres.get("mot_cle", "")).lower()
 
-    # Détection depuis la demande libre
     piquet_demande = "piquet" in demande
     parking_demande = "parking" in demande
     bethusy_demande = "bethusy" in demande
     montolieu_demande = "montolieu" in demande
     tunnel_demande = "tunnel" in demande
 
-    # Colonnes utiles
     adresse_txt = texte_col(df, "Adresse")
-    ville_txt = texte_col(df, "Ville")
-    type_txt = texte_col(df, "Type objet")
     global_txt = texte_global(df)
 
-    # -------------------------
-    # FILTRES BLOQUANTS
-    # -------------------------
-
-    # Ville
     ville = criteres.get("ville")
     if ville and ville != "Toutes" and "Ville" in df.columns:
         df = df[df["Ville"].astype(str).str.lower() == str(ville).lower()]
         adresse_txt = texte_col(df, "Adresse")
-        ville_txt = texte_col(df, "Ville")
-        type_txt = texte_col(df, "Type objet")
         global_txt = texte_global(df)
 
-    # Type objet
     type_objet = criteres.get("type_objet")
     if type_objet and type_objet != "Tous" and "Type objet" in df.columns:
         df = df[df["Type objet"].astype(str).str.lower() == str(type_objet).lower()]
         adresse_txt = texte_col(df, "Adresse")
-        ville_txt = texte_col(df, "Ville")
-        type_txt = texte_col(df, "Type objet")
         global_txt = texte_global(df)
 
-    # Budget min / max
     loyer_col = col_loyer(df)
     if loyer_col:
         loyers = pd.to_numeric(df[loyer_col], errors="coerce")
@@ -76,14 +61,11 @@ def recommander_logements(df_logements, criteres, top_n=3):
             df = df[loyers <= float(loyer_max)]
 
         adresse_txt = texte_col(df, "Adresse")
-        ville_txt = texte_col(df, "Ville")
-        type_txt = texte_col(df, "Type objet")
         global_txt = texte_global(df)
 
     if df.empty:
         return df
 
-    # Règles métier
     force_bethusy = (
         oui(criteres.get("piquet"))
         or oui(criteres.get("accompagne_2"))
@@ -101,40 +83,39 @@ def recommander_logements(df_logements, criteres, top_n=3):
         or parking_demande
     )
 
-    # Si contradiction Bethusy + Montolieu -> aucun résultat
     if force_bethusy and force_montolieu:
         return df.iloc[0:0]
 
     if force_bethusy:
-        df = df[adresse_txt.str.contains("bethusy", na=False) | global_txt.str.contains("bethusy", na=False)]
-        adresse_txt = texte_col(df, "Adresse")
-        global_txt = texte_global(df)
+        df = df[
+            texte_col(df, "Adresse").str.contains("bethusy", na=False) |
+            texte_global(df).str.contains("bethusy", na=False)
+        ]
 
-    if force_montolieu:
-        df = df[adresse_txt.str.contains("montolieu", na=False) | global_txt.str.contains("montolieu", na=False)]
-        adresse_txt = texte_col(df, "Adresse")
-        global_txt = texte_global(df)
+    if force_montolieu and not df.empty:
+        df = df[
+            texte_col(df, "Adresse").str.contains("montolieu", na=False) |
+            texte_global(df).str.contains("montolieu", na=False)
+        ]
 
     if exclure_tunnel and not df.empty:
-        df = df[~adresse_txt.str.contains("tunnel", na=False) & ~global_txt.str.contains("tunnel", na=False)]
-        adresse_txt = texte_col(df, "Adresse")
-        global_txt = texte_global(df)
+        df = df[
+            ~texte_col(df, "Adresse").str.contains("tunnel", na=False) &
+            ~texte_global(df).str.contains("tunnel", na=False)
+        ]
 
-    if tunnel_demande and not exclure_tunnel:
-        df = df[adresse_txt.str.contains("tunnel", na=False) | global_txt.str.contains("tunnel", na=False)]
-        adresse_txt = texte_col(df, "Adresse")
-        global_txt = texte_global(df)
+    if tunnel_demande and not exclure_tunnel and not df.empty:
+        df = df[
+            texte_col(df, "Adresse").str.contains("tunnel", na=False) |
+            texte_global(df).str.contains("tunnel", na=False)
+        ]
 
     if df.empty:
         return df
 
-    # -------------------------
-    # SCORING
-    # -------------------------
     df = df.copy()
     df["score"] = 0.0
 
-    # score budget : plus proche du milieu de tranche = mieux
     loyer_col = col_loyer(df)
     if loyer_col:
         loyers = pd.to_numeric(df[loyer_col], errors="coerce")
@@ -146,16 +127,12 @@ def recommander_logements(df_logements, criteres, top_n=3):
             ecart = (loyers - milieu).abs()
             df["score"] += (10 / (1 + ecart.fillna(9999) / 100)).round(2)
 
-    # bonus si la demande libre mentionne des mots trouvés
-    if demande:
-        for col in [c for c in ["Ville", "Adresse", "Type objet", "Référence interne", "Numéro unique"] if c in df.columns]:
-            df.loc[df[col].astype(str).str.lower().str.contains(demande, na=False), "score"] += 2
-
-    # bonus métier
     if force_bethusy:
         df["score"] += 3
+
     if force_montolieu:
         df["score"] += 3
+
     if exclure_tunnel:
         df["score"] += 1
 
