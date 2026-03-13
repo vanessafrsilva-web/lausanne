@@ -48,7 +48,7 @@ section[data-testid="stSidebar"] * {
 }
 
 .main {
-    background-color: #c7d9ed;
+    background-color: #073763;
 }
 
 }
