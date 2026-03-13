@@ -29,6 +29,36 @@ st.set_page_config(
     layout="wide",
     page_icon="📍"
 )
+st.markdown("""
+<style>
+
+/* Sidebar background */
+section[data-testid="stSidebar"] {
+    background-color: #102a43;
+}
+
+/* Texte sidebar */
+section[data-testid="stSidebar"] * {
+    color: white;
+}
+
+/* File uploader */
+section[data-testid="stSidebar"] .stFileUploader {
+    background-color: #1f3b63;
+    padding: 10px;
+    border-radius: 8px;
+}
+
+/* Boutons sidebar */
+section[data-testid="stSidebar"] .stButton>button {
+    background-color: #2E6BF6;
+    color: white;
+    border-radius: 8px;
+}
+
+</style>
+""", unsafe_allow_html=True)
+
 st.markdown(
     """
     <style>
