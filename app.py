@@ -147,6 +147,35 @@ div[role="listbox"] {
     background-color: transparent;
     border: none;
 }
+/* TABLEAU fond blanc */
+[data-testid="stDataFrame"] {
+    background-color: white !important;
+    border-radius: 10px;
+    border: 1px solid #dbe3f1;
+}
+
+/* cellules */
+[data-testid="stDataFrame"] .gdg-cell {
+    background-color: white !important;
+    color: #073763 !important;
+}
+
+/* header colonnes */
+[data-testid="stDataFrame"] .gdg-header {
+    background-color: #f4f7fc !important;
+    color: #073763 !important;
+    font-weight: 600;
+}
+
+/* texte dans cellules */
+[data-testid="stDataFrame"] span {
+    color: #073763 !important;
+}
+
+/* hover ligne */
+[data-testid="stDataFrame"] .gdg-row:hover {
+    background-color: #eef4ff !important;
+}
 
 </style>
 """, unsafe_allow_html=True)
