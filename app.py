@@ -80,7 +80,7 @@ section[data-testid="stSidebar"] .stButton > button:hover {
 
 /* Fond principal */
 [data-testid="stAppViewContainer"] {
-    background-color: #cfe2f3;
+    background-color: #ead1dc;
 }
 
 /* Titres et textes principaux seulement */
@@ -90,7 +90,7 @@ h1, h2, h3, h4, h5, h6, p, label, span, div {
 
 /* Onglets */
 button[data-baseweb="tab"] {
-    color: white !important;
+    color: #1f3b63;
     background: transparent !important;
     border-radius: 8px 8px 0 0;
 }
