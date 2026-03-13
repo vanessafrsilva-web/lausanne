@@ -127,6 +127,33 @@ div[role="listbox"] {
 [data-testid="stDataFrame"] tbody tr:hover {
     background-color: #eef3fb !important;
 }
+/* force dataframe grid white */
+[data-testid="stDataFrame"] div {
+    background-color: white !important;
+    color: black !important;
+}
+
+/* column headers */
+[data-testid="stDataFrame"] thead {
+    background-color: #f5f7fb !important;
+    color: #073763 !important;
+}
+
+/* grid cells */
+[data-testid="stDataFrame"] td {
+    color: black !important;
+}
+
+/* index column */
+[data-testid="stDataFrame"] [role="rowheader"] {
+    color: black !important;
+}
+
+/* table container card effect */
+[data-testid="stDataFrame"] {
+    padding: 10px;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+}
 </style>
 """, unsafe_allow_html=True)
 
