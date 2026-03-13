@@ -44,7 +44,7 @@ section[data-testid="stSidebar"] {
 section[data-testid="stSidebar"] [data-testid="stFileUploader"] {
     border-radius: 12px;
     padding: 12px;
-    background-color: #8dafe0;
+    background-color: #3F7DBD;
     border: 1px solid #d9e3f0;
 }
 /* bouton Browse files */
