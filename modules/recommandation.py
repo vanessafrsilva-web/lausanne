@@ -135,5 +135,20 @@ def recommander_logements(df_logements, criteres, top_n=3):
 
     if exclure_tunnel:
         df["score"] += 1
+# FIFO : priorité au logement loué il y a le plus longtemps
+if "Date de la dernière location" in df.columns:
+    df["date_fifo"] = pd.to_datetime(
+        df["Date de la dernière location"],
+        dayfirst=True,
+        errors="coerce"
+    )
 
+    df = df.sort_values(
+        by=["score", "date_fifo"],
+        ascending=[False, True]
+    )
+else:
+    df = df.sort_values(by=["score"], ascending=False)
+
+return df.head(top_n)
     return df.sort_values(["score"], ascending=False).head(top_n)
