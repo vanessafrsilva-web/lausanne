@@ -81,7 +81,7 @@ section[data-testid="stSidebar"] .stButton > button {
 }
 
 section[data-testid="stSidebar"] .stButton > button:hover {
-    background-color: #1c4ed8;
+    background-color: #C27BA0;
 }
 
 </style>
