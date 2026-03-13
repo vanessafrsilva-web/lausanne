@@ -42,36 +42,38 @@ section[data-testid="stSidebar"] * {
     color: white;
 }
 
-/* File uploader */
+/* zone upload */
 section[data-testid="stSidebar"] .stFileUploader {
     background-color: #1f3b63;
-    padding: 10px;
-    border-radius: 8px;
-}
-
-/* Boutons sidebar */
-section[data-testid="stSidebar"] .stButton>button {
-    background-color: #2E6BF6;
-    color: white;
-    border-radius: 8px;
+    padding: 12px;
+    border-radius: 10px;
 }
 
 /* bouton Browse files */
-section[data-testid="stSidebar"] button[kind="secondary"] {
-    background-color: #ffffff !important;
+section[data-testid="stSidebar"] .stFileUploader button {
+    background-color: white !important;
     color: #102a43 !important;
     border-radius: 6px;
     border: none;
+    font-weight: 600;
 }
 
-/* texte uploader */
-section[data-testid="stSidebar"] .stFileUploader label {
+/* hover bouton */
+section[data-testid="stSidebar"] .stFileUploader button:hover {
+    background-color: #e6eef8 !important;
+}
+
+/* bouton reset */
+section[data-testid="stSidebar"] .stButton > button {
+    background-color: #2E6BF6;
     color: white;
+    border-radius: 8px;
+    border: none;
 }
 
-/* bordure zone upload */
-section[data-testid="stSidebar"] .stFileUploader > div {
-    border: 1px solid #2E6BF6;
+/* hover reset */
+section[data-testid="stSidebar"] .stButton > button:hover {
+    background-color: #1c4ed8;
 }
 
 </style>
