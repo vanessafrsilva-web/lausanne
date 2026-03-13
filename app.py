@@ -7,11 +7,6 @@ import plotly.express as px
 import numpy as np
 from config.settings import AGENTS, BUREAU_ADRESSE, BUREAU_GPS, COULEURS
 
-
-
-
-COULEURS = {"Celine": "#d1e9ff", "Maria Claret": "#ffdae0", "Maria Elisabeth": "#d4f8d4", "⚠️ SANS AGENT": "#eeeeee"}
-
 st.set_page_config(page_title="Unité Logement - Gestion Planning", layout="wide", page_icon="📍")
 
 # --- FONCTIONS TECHNIQUES ---
