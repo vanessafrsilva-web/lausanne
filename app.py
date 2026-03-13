@@ -80,7 +80,7 @@ section[data-testid="stSidebar"] .stButton > button:hover {
 
 /* Fond principal */
 [data-testid="stAppViewContainer"] {
-    background-color: #ead1dc;
+    background-color: #fffff;
 }
 
 /* Titres et textes principaux seulement */
