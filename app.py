@@ -1,28 +1,14 @@
-from config.settings import AGENTS, BUREAU_ADRESSE, BUREAU_GPS, COULEURS
+
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 import io
 import plotly.express as px
 import numpy as np
+from config.settings import AGENTS, BUREAU_ADRESSE, BUREAU_GPS, COULEURS
 
 
 
-INFOS_BATIMENTS = {
-    'Bethusy A': {'rue': 'Avenue de Béthusy 54, Lausanne', 'lat': 46.5225, 'lon': 6.6472},
-    'Bethusy B': {'rue': 'Avenue de Béthusy 56, Lausanne', 'lat': 46.5227, 'lon': 6.6475},
-    'Montolieu A': {'rue': 'Isabelle-de-Montolieu 90, Lausanne', 'lat': 46.5412, 'lon': 6.6421},
-    'Montolieu B': {'rue': 'Isabelle-de-Montolieu 92, Lausanne', 'lat': 46.5415, 'lon': 6.6425},
-    'Tunnel': {'rue': 'Rue du Tunnel 17, Lausanne', 'lat': 46.5255, 'lon': 6.6328},
-    'Oron': {'rue': "Route d'Oron 77, 1010 Lausanne", 'lat': 46.5361, 'lon': 6.6625}
-}
-
-SECTEURS = {
-    'Bethusy': ['Bethusy A', 'Bethusy B'],
-    'Montolieu': ['Montolieu A', 'Montolieu B'],
-    'Tunnel': ['Tunnel'],
-    'Oron': ['Oron']
-}
 
 COULEURS = {"Celine": "#d1e9ff", "Maria Claret": "#ffdae0", "Maria Elisabeth": "#d4f8d4", "⚠️ SANS AGENT": "#eeeeee"}
 
