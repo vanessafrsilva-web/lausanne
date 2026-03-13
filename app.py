@@ -34,53 +34,63 @@ st.set_page_config(
 st.markdown("""
 <style>
 
-/* Sidebar blanche */
+/* SIDEBAR */
 section[data-testid="stSidebar"] {
     background-color: #073763;
 }
 
 section[data-testid="stSidebar"] * {
-    color: #102a43;
+    color: white;
 }
 
-[data-testid="stAppViewContainer"] {
-    background-color: #eef4fb;
-}
-
-.main {
-    background-color: #073763;
-}
-
-}
-
-/* Zone centrale */
-.main {
-    background-color: #073763;
-}
-
-/* Texte principal */
-[data-testid="stAppViewContainer"] * {
-        color: #ffffff;
-}
-
-/* uploader sidebar */
+/* Uploaders sidebar */
 section[data-testid="stSidebar"] [data-testid="stFileUploader"] {
-    border: 1px solid #fffff;
     border-radius: 10px;
     padding: 12px;
     background-color: #5086c4;
+    border: none;
 }
 
-/* bouton sidebar */
+/* Boutons sidebar */
 section[data-testid="stSidebar"] .stButton > button {
-    background-color: #fffff;
-    color: #5086c4;
+    background-color: white;
+    color: #073763;
     border-radius: 8px;
     border: none;
 }
 
 section[data-testid="stSidebar"] .stButton > button:hover {
     background-color: #9fc5e8;
+}
+
+/* FOND PRINCIPAL */
+[data-testid="stAppViewContainer"] {
+    background-color: #073763;
+}
+
+/* TEXTE PRINCIPAL */
+[data-testid="stAppViewContainer"] * {
+    color: white;
+}
+
+/* FILTRES (selectbox + input) */
+.stSelectbox div[data-baseweb="select"] > div {
+    background-color: #1f3b63 !important;
+    color: white !important;
+    border-radius: 8px;
+}
+
+/* Dropdown menu */
+div[role="listbox"] {
+    background-color: #1f3b63 !important;
+    color: white !important;
+}
+
+/* Champ number input */
+.stNumberInput input {
+    background-color: #1f3b63 !important;
+    color: white !important;
+    border-radius: 8px;
 }
 
 </style>
