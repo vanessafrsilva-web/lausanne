@@ -60,7 +60,7 @@ section[data-testid="stSidebar"] * {
 
 /* Texte principal */
 [data-testid="stAppViewContainer"] * {
-        color: #ffffff;
+        color: #073763;
 }
 
 /* uploader sidebar */
