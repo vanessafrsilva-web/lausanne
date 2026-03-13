@@ -49,7 +49,7 @@ section[data-testid="stSidebar"] [data-testid="stFileUploader"] {
 }
 /* bouton Browse files */
 [data-testid="stFileUploader"] button {
-    background-color: #1f4e79 !important;
+    background-color: #4c1130 !important;
     color: white !important;
     border-radius: 8px !important;
     border: none !important;
