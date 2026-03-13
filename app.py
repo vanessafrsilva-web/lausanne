@@ -37,7 +37,7 @@ st.markdown("""
 
 /* SIDEBAR */
 section[data-testid="stSidebar"] {
-    background-color: #f7f9fc;
+    background-color: #8dafe0;
 }
 
 /* Uploaders sidebar */
