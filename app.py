@@ -35,51 +35,59 @@ st.markdown("""
 <style>
 
 /* Sidebar */
-section[data-testid="stSidebar"]{
-    background-color:#102a43;
+section[data-testid="stSidebar"] {
+    background-color: #102a43;
 }
 
-section[data-testid="stSidebar"] *{
-    color:white;
+section[data-testid="stSidebar"] * {
+    color: white;
 }
 
-/* File uploader complet */
-section[data-testid="stSidebar"] [data-testid="stFileUploader"]{
-    background-color:#1f3b63;
-    border:2px dashed #2E6BF6;
-    border-radius:12px;
-    padding:18px;
+/* Carte uploader extérieure */
+section[data-testid="stSidebar"] [data-testid="stFileUploader"] {
+    background-color: #173a5e !important;
+    border: 1px solid #2E6BF6 !important;
+    border-radius: 14px !important;
+    padding: 14px !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
 }
 
-/* zone interne */
-section[data-testid="stSidebar"] [data-testid="stFileUploader"] div{
-    background-color:#1f3b63;
-    color:white;
+/* Zone blanche interne */
+section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] {
+    background-color: #f7f9fc !important;
+    border: none !important;
+    border-radius: 10px !important;
+    padding: 22px !important;
 }
 
-/* bouton browse */
-section[data-testid="stSidebar"] [data-testid="stFileUploader"] button{
-    background:#2E6BF6;
-    color:white;
-    border:none;
-    border-radius:8px;
+/* Texte dans la zone blanche */
+section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] * {
+    color: #102a43 !important;
 }
 
-/* bouton hover */
-section[data-testid="stSidebar"] [data-testid="stFileUploader"] button:hover{
-    background:#1c4ed8;
+/* Bouton browse */
+section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] button {
+    background-color: #2E6BF6 !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
 }
 
-/* boutons sidebar */
-section[data-testid="stSidebar"] .stButton > button{
-    background:#2E6BF6;
-    color:white;
-    border-radius:8px;
-    border:none;
+section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] button:hover {
+    background-color: #1c4ed8 !important;
 }
 
-section[data-testid="stSidebar"] .stButton > button:hover{
-    background:#1c4ed8;
+/* Boutons classiques */
+section[data-testid="stSidebar"] .stButton > button {
+    background-color: #2E6BF6 !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 8px !important;
+}
+
+section[data-testid="stSidebar"] .stButton > button:hover {
+    background-color: #1c4ed8 !important;
 }
 
 </style>
