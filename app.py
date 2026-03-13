@@ -54,7 +54,7 @@ section[data-testid="stSidebar"] [data-testid="stFileUploader"] {
 
 /* boutons sidebar */
 section[data-testid="stSidebar"] .stButton > button {
-    background-color: #073763;
+    background-color: #ffffff;
     color: white;
     border-radius: 8px;
     border: none;
