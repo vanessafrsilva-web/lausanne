@@ -55,41 +55,16 @@ section[data-testid="stSidebar"] [data-testid="stFileUploader"] {
 /* boutons sidebar */
 section[data-testid="stSidebar"] .stButton > button {
     background-color: #ffffff;
-    color: white;
+    color: #073763;
     border-radius: 8px;
     border: 1px solid #073763;
 }
 
 section[data-testid="stSidebar"] .stButton > button:hover {
     background-color: #1f4e79;
+    color: white;
 }
 
-
-/* Champ recherche texte */
-.stTextInput input {
-    background-color: #1f3b63 !important;
-    color: white !important;
-    border-radius: 8px;
-    border: 1px solid #9fc5e8;
-}
-
-/* placeholder texte */
-.stTextInput input::placeholder {
-    color: #cfe2f3;
-}
-
-/* focus */
-.stTextInput input:focus {
-    border: 1px solid #ffffff;
-}
-
-/* curseur */
-.stTextInput input {
-    caret-color: white;
-}
-
-</style>
-""", unsafe_allow_html=True)
 /* FOND PRINCIPAL APP */
 [data-testid="stAppViewContainer"] {
     background-color: #073763;
@@ -118,6 +93,20 @@ div[role="listbox"] {
     background-color: #1f3b63 !important;
     color: white !important;
     border-radius: 8px;
+}
+
+/* Champ recherche texte */
+.stTextInput input {
+    background-color: #1f3b63 !important;
+    color: white !important;
+    border-radius: 8px;
+    border: 1px solid #9fc5e8;
+    caret-color: white;
+}
+
+/* placeholder */
+.stTextInput input::placeholder {
+    color: #cfe2f3;
 }
 
 </style>
