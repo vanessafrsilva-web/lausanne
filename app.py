@@ -65,16 +65,16 @@ section[data-testid="stSidebar"] * {
 
 /* uploader sidebar */
 section[data-testid="stSidebar"] [data-testid="stFileUploader"] {
-    border: 1px solid #073763;
+    border: 1px solid #fffff;
     border-radius: 10px;
     padding: 12px;
-    background-color: #fffff;
+    background-color: #5086c4;
 }
 
 /* bouton sidebar */
 section[data-testid="stSidebar"] .stButton > button {
-    background-color: #0b5394;
-    color: #fffff;
+    background-color: #fffff;
+    color: #5086c4;
     border-radius: 8px;
     border: none;
 }
