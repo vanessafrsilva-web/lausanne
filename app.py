@@ -242,7 +242,7 @@ with t0:
             recherche = recherche.lower()
             colonnes_recherche = ["Ville", "Adresse", "Type objet", "Référence interne", "Numéro unique"]
 
-            masque = False
+            masque = pd.Series(False, index=df_filtre.index)
             for col in colonnes_recherche:
                 if col in df_filtre.columns:
                     masque = masque | df_filtre[col].astype(str).str.lower().str.contains(recherche, na=False)
@@ -251,9 +251,9 @@ with t0:
 
         c1, c2 = st.columns(2)
         c1.metric("Logements trouvés", len(df_filtre))
-        c2.metric("Immeubles distincts", df_filtre["Adresse"].nunique())
+        c2.metric("Immeubles distincts", df_filtre["Adresse"].nunique() if "Adresse" in df_filtre.columns else 0)
 
-st.data_editor(df_filtre, use_container_width=True, disabled=True)
+        st.data_editor(df_filtre, use_container_width=True, disabled=True)
 
         if "Adresse" in df_filtre.columns:
             st.markdown("### 📊 Répartition par immeuble")
