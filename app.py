@@ -1,12 +1,14 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 import io
 import plotly.express as px
+import numpy as np
 
 from modules.data_loader import charger_logements
 from config.settings import (
     AGENTS,
+    BUREAU_ADRESSE,
     BUREAU_GPS,
     COULEURS,
     INFOS_BATIMENTS,
@@ -73,7 +75,7 @@ section[data-testid="stSidebar"] .stButton > button:hover {
     color: white;
 }
 
-/* SELECTBOX */
+/* SELECTBOX (filtres) */
 .stSelectbox div[data-baseweb="select"] > div {
     background-color: #1f3b63 !important;
     color: white !important;
@@ -93,7 +95,7 @@ div[role="listbox"] {
     border-radius: 8px;
 }
 
-/* text input */
+/* Champ recherche texte */
 .stTextInput input {
     background-color: #1f3b63 !important;
     color: white !important;
@@ -107,11 +109,6 @@ div[role="listbox"] {
     color: #cfe2f3;
 }
 
-/* radio labels */
-.stRadio label {
-    color: white !important;
-}
-
 </style>
 """, unsafe_allow_html=True)
 
@@ -122,81 +119,6 @@ def trouver_secteur(batiment):
         if batiment in liste:
             return secteur
     return batiment
-
-
-def trouver_colonne(df, candidats, default=None):
-    cols_lower = {c.lower(): c for c in df.columns}
-    for c in df.columns:
-        cl = c.lower()
-        for mot in candidats:
-            if mot in cl:
-                return c
-    return default
-
-
-def normaliser_prix(df):
-    col_prix = trouver_colonne(df, ["prix", "loyer", "montant"])
-    if col_prix is None:
-        df["Prix_match"] = pd.NA
-        return df, None
-
-    df["Prix_match"] = (
-        df[col_prix]
-        .astype(str)
-        .str.replace("CHF", "", regex=False)
-        .str.replace("chf", "", regex=False)
-        .str.replace("'", "", regex=False)
-        .str.replace(" ", "", regex=False)
-        .str.replace(",", ".", regex=False)
-        .str.extract(r"(\d+\.?\d*)")[0]
-    )
-    df["Prix_match"] = pd.to_numeric(df["Prix_match"], errors="coerce")
-    return df, col_prix
-
-
-def calculer_score_logement(row, budget_max, ville_recherche, type_objet_recherche, parking_demande):
-    score = 0
-
-    # Budget: 40 points
-    prix = row.get("Prix_match")
-    if pd.notna(prix):
-        if prix <= budget_max:
-            score += 40
-        else:
-            depassement = prix - budget_max
-            if depassement <= 100:
-                score += 20
-    else:
-        score += 10  # info absente, petit score partiel
-
-    # Ville: 25 points
-    ville = str(row.get("Ville", "")).strip().lower()
-    if ville_recherche != "Toutes":
-        if ville == ville_recherche.strip().lower():
-            score += 25
-    else:
-        score += 25
-
-    # Type objet: 25 points
-    type_objet = str(row.get("Type objet", "")).strip().lower()
-    if type_objet_recherche != "Tous":
-        if type_objet == type_objet_recherche.strip().lower():
-            score += 25
-    else:
-        score += 25
-
-    # Parking: 10 points
-    # Si on n'a pas d'info parking dans le fichier, on donne un score neutre si "Non"
-    parking_col = row.get("_parking_col_name", None)
-    if parking_demande == "Non":
-        score += 10
-    else:
-        if parking_col and pd.notna(row.get(parking_col)):
-            val = str(row.get(parking_col, "")).lower()
-            if any(x in val for x in ["oui", "yes", "1", "true", "parking"]):
-                score += 10
-
-    return min(score, 100)
 
 
 # --- SESSION STATE ---
@@ -227,16 +149,12 @@ if "attributions" not in st.session_state:
         "Ancien locataire"
     ])
 
-if "match_results" not in st.session_state:
-    st.session_state.match_results = pd.DataFrame()
-
 
 # --- INTERFACE ---
 st.title("📍 Unité Logement : 2.0")
 
-t0, t_match, t_attrib, t1, t2, t3 = st.tabs([
+t0, t_attrib, t1, t2, t3 = st.tabs([
     "🏠 Logements vacants",
-    "🎯 Aide au choix",
     "📝 Attribution logement",
     "📝 Planning Global",
     "📅 Vue par Agent",
@@ -360,7 +278,6 @@ with st.sidebar:
             "Salaire",
             "Ancien locataire"
         ])
-        st.session_state.match_results = pd.DataFrame()
         st.rerun()
 
 
@@ -380,15 +297,15 @@ with t0:
 
         with col1:
             villes = ["Toutes"] + sorted(df_log["Ville"].dropna().astype(str).unique().tolist())
-            ville_sel = st.selectbox("Ville", villes, key="vacants_ville")
+            ville_sel = st.selectbox("Ville", villes)
 
         with col2:
             immeubles = ["Tous"] + sorted(df_log["Adresse"].dropna().astype(str).unique().tolist())
-            immeuble_sel = st.selectbox("Adresse / Immeuble", immeubles, key="vacants_adresse")
+            immeuble_sel = st.selectbox("Adresse / Immeuble", immeubles)
 
         with col3:
             types_objet = ["Tous"] + sorted(df_log["Type objet"].dropna().astype(str).unique().tolist())
-            type_objet_sel = st.selectbox("Type d'objet", types_objet, key="vacants_type")
+            type_objet_sel = st.selectbox("Type d'objet", types_objet)
 
         df_filtre = df_log.copy()
 
@@ -432,97 +349,6 @@ with t0:
         st.info("Aucune liste de logements chargée.")
 
 
-# --- ONGLET MATCHING ---
-with t_match:
-    st.subheader("🎯 Aide au choix du logement")
-
-    if not st.session_state.logements.empty:
-        df_log = st.session_state.logements.copy()
-
-        # Colonnes utiles
-        df_log, col_prix = normaliser_prix(df_log)
-        col_parking = trouver_colonne(df_log, ["parking", "parc"])
-
-        if col_parking is not None:
-            df_log["_parking_col_name"] = col_parking
-        else:
-            df_log["_parking_col_name"] = None
-
-        st.markdown("### 👤 Critères de recherche")
-
-        col1, col2 = st.columns(2)
-
-        with col1:
-            nom_personne = st.text_input("Nom de la personne", key="match_nom")
-            ville_recherche = st.selectbox(
-                "Ville souhaitée",
-                ["Toutes"] + sorted(df_log["Ville"].dropna().astype(str).unique().tolist()),
-                key="match_ville"
-            )
-
-        with col2:
-            type_objet_recherche = st.selectbox(
-                "Type d'objet",
-                ["Tous"] + sorted(df_log["Type objet"].dropna().astype(str).unique().tolist()),
-                key="match_type"
-            )
-            parking_demande = st.radio(
-                "Parking souhaité",
-                ["Non", "Oui"],
-                key="match_parking"
-            )
-
-        budget_max = st.number_input(
-            "Budget maximum (CHF)",
-            min_value=0.0,
-            value=1500.0,
-            step=50.0,
-            key="match_budget"
-        )
-
-        if st.button("🔎 Rechercher les meilleurs logements", key="btn_match"):
-            df_match = df_log.copy()
-
-            if ville_recherche != "Toutes":
-                df_match = df_match[df_match["Ville"].astype(str) == ville_recherche]
-
-            if type_objet_recherche != "Tous":
-                df_match = df_match[df_match["Type objet"].astype(str) == type_objet_recherche]
-
-            if parking_demande == "Oui" and col_parking is not None:
-                df_match = df_match[
-                    df_match[col_parking].astype(str).str.lower().str.contains(
-                        "oui|yes|1|true|parking|intérieur|extérieur", na=False
-                    )
-                ]
-
-            if not df_match.empty:
-                df_match["Score optimisation"] = df_match.apply(
-                    lambda row: calculer_score_logement(
-                        row,
-                        budget_max=budget_max,
-                        ville_recherche=ville_recherche,
-                        type_objet_recherche=type_objet_recherche,
-                        parking_demande=parking_demande
-                    ),
-                    axis=1
-                )
-
-                df_match = df_match.sort_values("Score optimisation", ascending=False).head(3)
-                st.session_state.match_results = df_match.copy()
-            else:
-                st.session_state.match_results = pd.DataFrame()
-
-        if not st.session_state.match_results.empty:
-            st.markdown("### ✅ Top 3 logements recommandés")
-            st.dataframe(st.session_state.match_results, use_container_width=True)
-        else:
-            st.info("Aucune recommandation pour l'instant.")
-
-    else:
-        st.warning("Charge d'abord la liste des logements vacants dans la sidebar.")
-
-
 # --- ONGLET ATTRIBUTION ---
 with t_attrib:
     st.subheader("📝 Formulaire d'attribution")
@@ -531,7 +357,7 @@ with t_attrib:
         df_log = st.session_state.logements.copy()
 
         logements_options = df_log["Numéro unique"].dropna().astype(str).tolist()
-        logement_selectionne = st.selectbox("Choisir un logement", logements_options, key="attrib_logement")
+        logement_selectionne = st.selectbox("Choisir un logement", logements_options)
 
         logement_info = df_log[df_log["Numéro unique"].astype(str) == logement_selectionne].iloc[0]
 
