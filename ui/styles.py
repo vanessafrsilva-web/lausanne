@@ -131,6 +131,22 @@ def appliquer_styles():
         background-color: white !important;
         color: #1f2c3d !important;
     }
+    /* HEADER TABLEAU */
+[data-testid="stDataFrame"] .gdg-header {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    font-weight: 600;
+}
+
+/* TEXTE HEADER */
+[data-testid="stDataFrame"] .gdg-header span {
+    color: #000000 !important;
+}
+
+/* LIGNE HEADER */
+[data-testid="stDataFrame"] .gdg-header-row {
+    background-color: #ffffff !important;
+}
 
     /* ===============================
        RADIO / CHECKBOX
