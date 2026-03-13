@@ -291,7 +291,6 @@ with t_ai:
 
         with col2:
             budget = st.number_input("Budget maximum", 0.0, 5000.0, 1500.0, key="ai_budget")
-            surface = st.number_input("Surface minimale", 0.0, 200.0, 20.0, key="ai_surface")
 
         demande = st.text_area(
             "Demande utilisateur",
@@ -304,7 +303,6 @@ with t_ai:
                 "ville": ville,
                 "type_objet": type_objet,
                 "budget_max": budget,
-                "surface_min": surface,
                 "mot_cle": demande
             }
 
