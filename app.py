@@ -108,23 +108,21 @@ t0, t1, t2, t3 = st.tabs([
 
 
 # --- SIDEBAR ---
-with st.sidebar:
-    st.header("📂 Importation")
 
 with st.sidebar:
 
     st.header("📂 Importation")
 
     up = st.file_uploader(
-        "📂 Déposer le fichier des missions",
+        "Déposer le fichier des missions",
         type=["xlsx"],
         key="upload_missions"
     )
 
-    st.subheader("Logements vacants")
+    st.subheader("🏠 Logements vacants")
 
     up_logements = st.file_uploader(
-        "🏠 Déposer la liste des appartements vacants",
+        "Déposer la liste des appartements vacants",
         type=["csv", "xlsx"],
         key="upload_logements"
     )
