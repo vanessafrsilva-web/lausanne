@@ -35,125 +35,103 @@ st.set_page_config(
 st.markdown("""
 <style>
 
-/* SIDEBAR BLANCHE */
+/* SIDEBAR */
 section[data-testid="stSidebar"] {
-    background-color: #ffffff;
+    background-color: #f7f9fc;
 }
 
-/* uploaders sidebar */
+/* Uploaders sidebar */
 section[data-testid="stSidebar"] [data-testid="stFileUploader"] {
-    border-radius: 10px;
+    border-radius: 12px;
     padding: 12px;
-    background-color: #073763;
-    border: 1px solid #dbe3f1;
+    background-color: #0b3f75;
+    border: 1px solid #d9e3f0;
 }
 
-/* boutons sidebar */
+/* Boutons sidebar */
 section[data-testid="stSidebar"] .stButton > button {
-    background-color: #073763;
-    color: #ffffff;
+    background-color: #0b3f75;
+    color: white;
     border-radius: 8px;
-    border: 1px solid #073763;
+    border: 1px solid #0b3f75;
 }
 
 section[data-testid="stSidebar"] .stButton > button:hover {
     background-color: #1f4e79;
     color: white;
+    border: 1px solid #1f4e79;
 }
 
-/* FOND PRINCIPAL APP */
+/* Fond principal */
 [data-testid="stAppViewContainer"] {
     background-color: #073763;
 }
 
-/* TEXTE PRINCIPAL */
-[data-testid="stAppViewContainer"] * {
+/* Titres et textes principaux seulement */
+h1, h2, h3, h4, h5, h6, p, label, span, div {
     color: white;
 }
 
-/* SELECTBOX (filtres) */
+/* Onglets */
+button[data-baseweb="tab"] {
+    color: white !important;
+    background: transparent !important;
+    border-radius: 8px 8px 0 0;
+}
+
+button[data-baseweb="tab"][aria-selected="true"] {
+    border-bottom: 2px solid #4da3ff !important;
+}
+
+/* Inputs */
+.stTextInput input,
+.stNumberInput input,
+.stTextArea textarea {
+    background-color: #1f3b63 !important;
+    color: white !important;
+    border-radius: 8px !important;
+    border: 1px solid #9fc5e8 !important;
+}
+
+.stTextInput input::placeholder,
+.stTextArea textarea::placeholder {
+    color: #cfe2f3 !important;
+}
+
+/* Selectbox */
 .stSelectbox div[data-baseweb="select"] > div {
     background-color: #1f3b63 !important;
     color: white !important;
-    border-radius: 8px;
+    border-radius: 8px !important;
+    border: 1px solid #9fc5e8 !important;
 }
 
-/* menu dropdown */
+/* Menu déroulant */
 div[role="listbox"] {
     background-color: #1f3b63 !important;
     color: white !important;
 }
 
-/* number input */
-.stNumberInput input {
-    background-color: #1f3b63 !important;
-    color: white !important;
-    border-radius: 8px;
-}
-
-/* Champ recherche texte */
-.stTextInput input {
-    background-color: #1f3b63 !important;
-    color: white !important;
-    border-radius: 8px;
-    border: 1px solid #9fc5e8;
-    caret-color: white;
-}
-
-/* placeholder */
-.stTextInput input::placeholder {
-    color: #cfe2f3;
-}
-/* TABLE / DATAFRAME FOND BLANC */
+/* Dataframe container */
 [data-testid="stDataFrame"] {
+    border-radius: 12px;
+    overflow: hidden;
     background-color: white !important;
-    color: black !important;
-    border-radius: 10px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+    border: 1px solid #dbe3f1;
 }
 
-/* header table */
-[data-testid="stDataFrame"] thead tr th {
-    background-color: #f5f7fb !important;
-    color: #073763 !important;
+/* Corrige surtout le texte du tableau */
+[data-testid="stDataFrame"] * {
+    color: #1f1f1f !important;
 }
 
-/* cellules */
-[data-testid="stDataFrame"] tbody tr td {
-    background-color: white !important;
-    color: black !important;
+/* Un peu plus doux pour les métriques */
+[data-testid="metric-container"] {
+    background-color: transparent;
+    border: none;
 }
 
-/* hover lignes */
-[data-testid="stDataFrame"] tbody tr:hover {
-    background-color: #eef3fb !important;
-}
-/* force dataframe grid white */
-[data-testid="stDataFrame"] div {
-    background-color: white !important;
-    color: black !important;
-}
-
-/* column headers */
-[data-testid="stDataFrame"] thead {
-    background-color: #f5f7fb !important;
-    color: #073763 !important;
-}
-
-/* grid cells */
-[data-testid="stDataFrame"] td {
-    color: black !important;
-}
-
-/* index column */
-[data-testid="stDataFrame"] [role="rowheader"] {
-    color: black !important;
-}
-
-/* table container card effect */
-[data-testid="stDataFrame"] {
-    padding: 10px;
-    box-shadow: 0 6px 16px rgba(0,0,0,0.15);
-}
 </style>
 """, unsafe_allow_html=True)
 
