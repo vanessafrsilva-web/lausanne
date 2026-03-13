@@ -37,14 +37,14 @@ st.markdown("""
 
 /* SIDEBAR */
 section[data-testid="stSidebar"] {
-    background-color: #3F7DBD;
+    background-color: #741b47;
 }
 
 /* Uploaders sidebar */
 section[data-testid="stSidebar"] [data-testid="stFileUploader"] {
     border-radius: 12px;
     padding: 12px;
-    background-color: #3F7DBD;
+    background-color: #741b47;
     border: 1px solid #d9e3f0;
 }
 /* bouton Browse files */
