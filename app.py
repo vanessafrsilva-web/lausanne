@@ -56,11 +56,6 @@ section[data-testid="stSidebar"] .stButton>button {
     border-radius: 8px;
 }
 
-</style>
-""", unsafe_allow_html=True)
-st.markdown("""
-<style>
-
 /* bouton Browse files */
 section[data-testid="stSidebar"] button[kind="secondary"] {
     background-color: #ffffff !important;
