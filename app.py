@@ -1,9 +1,8 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime
 import io
 import plotly.express as px
-import numpy as np
 from ui.styles import appliquer_styles
 from modules.recommandation import recommander_logements
 
@@ -32,7 +31,9 @@ st.set_page_config(
     layout="wide",
     page_icon="📍"
 )
+
 appliquer_styles()
+
 
 # --- FONCTIONS TECHNIQUES ---
 def trouver_secteur(batiment):
@@ -104,7 +105,7 @@ with st.sidebar:
         key="upload_logements"
     )
 
-    if up_logements and st.button("🏠 Charger les logements"):
+    if up_logements and st.button("🏠 Charger les logements", key="btn_charger_logements"):
         try:
             df_logements = charger_logements(up_logements)
             st.session_state.logements = df_logements
@@ -112,7 +113,7 @@ with st.sidebar:
         except Exception as e:
             st.error(f"Erreur logements : {e}")
 
-    if up and st.button("🚀 Lancer l'Attribution"):
+    if up and st.button("🚀 Lancer l'Attribution", key="btn_lancer_attribution"):
         try:
             df_ex = charger_excel(up).dropna(how="all").fillna("")
             df_ex.columns = df_ex.columns.str.strip()
@@ -125,7 +126,8 @@ with st.sidebar:
             c_bat = next((c for c in df_ex.columns if "bat" in c.lower() or "bât" in c.lower()), "Batiment")
 
             temp_rows = []
-            df_ex[c_date] = pd.to_datetime(df_ex[c_date])
+            df_ex[c_date] = pd.to_datetime(df_ex[c_date], errors="coerce")
+            df_ex = df_ex.dropna(subset=[c_date])
 
             for jour in sorted(df_ex[c_date].unique()):
                 ds = pd.to_datetime(jour).strftime("%d/%m/%Y")
@@ -178,7 +180,7 @@ with st.sidebar:
         except Exception as e:
             st.error(f"Erreur missions : {e}")
 
-    if st.button("🗑️ Reset"):
+    if st.button("🗑️ Reset", key="btn_reset"):
         st.session_state.db = pd.DataFrame(
             columns=["ID", "Batiment", "Date", "Heure", "Agent", "Rue", "Type", "Statut", "Date_Sort"]
         )
@@ -212,24 +214,24 @@ with t0:
 
         recherche = st.text_input(
             "🔎 Recherche rapide",
-            placeholder="Ex: Lausanne, Montolieu, N° Studio..."
+            placeholder="Ex: Lausanne, Montolieu, N° Studio...",
+            key="vacants_recherche"
         )
 
         col1, col2, col3 = st.columns(3)
 
-with col1:
-    villes = ["Toutes"] + sorted(df_log["Ville"].dropna().astype(str).unique().tolist())
-    ville_sel = st.selectbox("Ville", villes, key="vacants_ville")
+        with col1:
+            villes = ["Toutes"] + sorted(df_log["Ville"].dropna().astype(str).unique().tolist())
+            ville_sel = st.selectbox("Ville", villes, key="vacants_ville")
 
-with col2:
-    immeubles = ["Tous"] + sorted(df_log["Adresse"].dropna().astype(str).unique().tolist())
-    immeuble_sel = st.selectbox("Adresse / Immeuble", immeubles, key="vacants_immeuble")
+        with col2:
+            immeubles = ["Tous"] + sorted(df_log["Adresse"].dropna().astype(str).unique().tolist())
+            immeuble_sel = st.selectbox("Adresse / Immeuble", immeubles, key="vacants_immeuble")
 
-with col3:
-    types_objet = ["Tous"] + sorted(df_log["Type objet"].dropna().astype(str).unique().tolist())
-    type_objet_sel = st.selectbox("Type d'objet", types_objet, key="vacants_type_objet")
+        with col3:
+            types_objet = ["Tous"] + sorted(df_log["Type objet"].dropna().astype(str).unique().tolist())
+            type_objet_sel = st.selectbox("Type d'objet", types_objet, key="vacants_type_objet")
 
-        
         df_filtre = df_log.copy()
 
         if ville_sel != "Toutes":
@@ -256,7 +258,12 @@ with col3:
         c1.metric("Logements trouvés", len(df_filtre))
         c2.metric("Immeubles distincts", df_filtre["Adresse"].nunique() if "Adresse" in df_filtre.columns else 0)
 
-        st.data_editor(df_filtre, use_container_width=True, disabled=True)
+        st.data_editor(
+            df_filtre,
+            use_container_width=True,
+            disabled=True,
+            key="vacants_tableau"
+        )
 
         if "Adresse" in df_filtre.columns:
             st.markdown("### 📊 Répartition par immeuble")
@@ -266,11 +273,13 @@ with col3:
                 .reset_index()
             )
             repartition.columns = ["Adresse", "Nombre de logements"]
-            st.dataframe(repartition, use_container_width=True)
+            st.dataframe(repartition, use_container_width=True, key="vacants_repartition")
 
     else:
         st.info("Aucune liste de logements chargée.")
 
+
+# --- ONGLET IA ---
 with t_ai:
     st.subheader("🤖 Recherche intelligente de logements")
 
@@ -354,11 +363,13 @@ with t_attrib:
     if not st.session_state.logements.empty:
         df_log = st.session_state.logements.copy()
 
-  logement_selectionne = st.selectbox(
-    "Choisir un logement",
-    logements_options,
-    key="attrib_logement"
-)
+        logements_options = df_log["Numéro unique"].dropna().astype(str).tolist()
+
+        logement_selectionne = st.selectbox(
+            "Choisir un logement",
+            logements_options,
+            key="attrib_logement"
+        )
 
         logement_info = df_log[df_log["Numéro unique"].astype(str) == logement_selectionne].iloc[0]
 
@@ -393,7 +404,7 @@ with t_attrib:
             facture = st.text_input("Facture", key="attrib_facture")
             salaire = st.text_input("Salaire", key="attrib_salaire")
 
-        if st.button("✅ Valider l'attribution"):
+        if st.button("✅ Valider l'attribution", key="attrib_valider"):
             nouvelle_attribution = pd.DataFrame([{
                 "Nom": nom,
                 "Prénom": prenom,
@@ -402,7 +413,7 @@ with t_attrib:
                 "Bâtiment": logement_info.get("Adresse", ""),
                 "Studio": logement_info.get("Numéro unique", ""),
                 "Type objet": logement_info.get("Type objet", ""),
-                "Prix logement": logement_info.get("Prix", ""),
+                "Prix logement": logement_info.get("Prix", logement_info.get("Loyer Net", "")),
                 "Nom 2ème personne": nom_2eme,
                 "Parc": parc,
                 "Type parc": type_parc,
@@ -420,7 +431,7 @@ with t_attrib:
             st.success("Attribution enregistrée avec succès.")
 
         st.markdown("### 📋 Attributions enregistrées")
-        st.dataframe(st.session_state.attributions, use_container_width=True)
+        st.dataframe(st.session_state.attributions, use_container_width=True, key="attrib_tableau")
 
     else:
         st.warning("Charge d'abord la liste des logements vacants dans la sidebar.")
@@ -452,7 +463,8 @@ if not st.session_state.db.empty:
             "📄 Télécharger Liste Standard",
             out_std.getvalue(),
             "Planning_Liste.xlsx",
-            use_container_width=True
+            use_container_width=True,
+            key="planning_export_standard"
         )
 
         df_pivot = df_v.copy()
@@ -471,7 +483,8 @@ if not st.session_state.db.empty:
             out_vis.getvalue(),
             "Planning_Equipe.xlsx",
             type="primary",
-            use_container_width=True
+            use_container_width=True,
+            key="planning_export_agent"
         )
 
         st.divider()
@@ -488,7 +501,8 @@ if not st.session_state.db.empty:
                     data=ics_data,
                     file_name=f"Planning_{agt}.ics",
                     mime="text/calendar",
-                    use_container_width=True
+                    use_container_width=True,
+                    key=f"ics_{agt}"
                 )
 
     with t2:
@@ -497,7 +511,7 @@ if not st.session_state.db.empty:
             key=lambda x: datetime.strptime(x, "%d/%m/%Y")
         )
 
-        sel_j = st.selectbox("📅 Sélectionner une date :", dates_j)
+        sel_j = st.selectbox("📅 Sélectionner une date :", dates_j, key="vue_agent_date")
         cols_v = st.columns(len(AGENTS))
 
         for i, a in enumerate(AGENTS):
@@ -523,8 +537,8 @@ if not st.session_state.db.empty:
         df_rep["Date_Sort"] = pd.to_datetime(df_rep["Date_Sort"])
         df_rep["Mois"] = df_rep["Date_Sort"].dt.strftime("%B %Y")
 
-        mois_sel = st.selectbox("📅 Mois :", df_rep["Mois"].unique())
-        agents_sel = st.multiselect("👤 Agents :", AGENTS, default=AGENTS)
+        mois_sel = st.selectbox("📅 Mois :", df_rep["Mois"].unique(), key="rapport_mois")
+        agents_sel = st.multiselect("👤 Agents :", AGENTS, default=AGENTS, key="rapport_agents")
 
         df_f = df_rep[
             (df_rep["Mois"] == mois_sel) &
