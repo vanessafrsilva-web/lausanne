@@ -40,16 +40,12 @@ section[data-testid="stSidebar"] {
     background-color: #ffffff;
 }
 
-/* TEXTE SIDEBAR BLEU */
-section[data-testid="stSidebar"] * {
-    color: #ffffff;;
-}
 
 /* uploaders sidebar */
 section[data-testid="stSidebar"] [data-testid="stFileUploader"] {
     border-radius: 10px;
     padding: 12px;
-    background-color: #ffffff;
+    background-color: #073763;
     border: 1px solid #dbe3f1;
 }
 
