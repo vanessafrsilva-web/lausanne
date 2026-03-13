@@ -296,16 +296,9 @@ with t0:
             df_filtre = df_filtre[masque]
 
         # Indicateurs
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Logements trouvés", len(df_filtre))
-        c2.metric("Immeubles distincts", df_filtre["Adresse"].nunique() if "Adresse" in df_filtre.columns else 0)
-
-        if "Adresse" in df_filtre.columns and not df_filtre.empty:
-            top_immeuble = df_filtre["Adresse"].value_counts().idxmax()
-            top_count = df_filtre["Adresse"].value_counts().max()
-            c3.metric("Immeuble le plus représenté", f"{top_count}", help=top_immeuble)
-        else:
-            c3.metric("Immeuble le plus représenté", "0")
+c1, c2 = st.columns(2)
+c1.metric("Logements trouvés", len(df_filtre))
+c2.metric("Immeubles distincts", df_filtre["Adresse"].nunique())
 
         st.dataframe(df_filtre, use_container_width=True)
 
