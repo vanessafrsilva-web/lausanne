@@ -162,55 +162,47 @@ with st.sidebar:
 
 # --- ONGLET LOGEMENTS ---
 with t0:
-
     st.subheader("🏠 Logements disponibles")
 
     if not st.session_state.logements.empty:
-
         df_log = st.session_state.logements.copy()
-        df_log["Surface"] = (
-    df_log["Surface"]
-    .astype(str)
-    .str.replace(",", ".", regex=False)
-    .str.extract(r"(\d+\.?\d*)")[0]
-)
 
-df_log["Surface"] = pd.to_numeric(df_log["Surface"], errors="coerce")
+        df_log["Surface"] = (
+            df_log["Surface"]
+            .astype(str)
+            .str.replace(",", ".", regex=False)
+            .str.extract(r"(\d+\.?\d*)")[0]
+        )
+        df_log["Surface"] = pd.to_numeric(df_log["Surface"], errors="coerce")
 
         col1, col2, col3 = st.columns(3)
 
-        # filtre ville
         with col1:
-            villes = ["Toutes"] + sorted(df_log["Ville"].dropna().unique().tolist())
+            villes = ["Toutes"] + sorted(df_log["Ville"].dropna().astype(str).unique().tolist())
             ville_sel = st.selectbox("Ville", villes)
 
-        # filtre immeuble
         with col2:
-            immeubles = ["Tous"] + sorted(df_log["Adresse"].dropna().unique().tolist())
+            immeubles = ["Tous"] + sorted(df_log["Adresse"].dropna().astype(str).unique().tolist())
             immeuble_sel = st.selectbox("Adresse / Immeuble", immeubles)
 
-        # filtre surface
         with col3:
-            surface_min = st.number_input("Surface minimum", value=0)
+            surface_min = st.number_input("Surface minimum", min_value=0, value=20)
 
-        # application filtres
         df_filtre = df_log.copy()
 
         if ville_sel != "Toutes":
-            df_filtre = df_filtre[df_filtre["Ville"] == ville_sel]
+            df_filtre = df_filtre[df_filtre["Ville"].astype(str) == ville_sel]
 
         if immeuble_sel != "Tous":
-            df_filtre = df_filtre[df_filtre["Adresse"] == immeuble_sel]
+            df_filtre = df_filtre[df_filtre["Adresse"].astype(str) == immeuble_sel]
 
         if surface_min > 0:
             df_filtre = df_filtre[df_filtre["Surface"] >= surface_min]
 
         st.write(f"Logements trouvés : {len(df_filtre)}")
-
         st.dataframe(df_filtre, use_container_width=True)
 
     else:
-
         st.info("Aucune liste de logements chargée.")
 
 
