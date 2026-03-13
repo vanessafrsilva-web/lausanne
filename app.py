@@ -237,14 +237,6 @@ with t0:
     if not st.session_state.logements.empty:
         df_log = st.session_state.logements.copy()
 
-        df_log["Surface"] = (
-            df_log["Surface"]
-            .astype(str)
-            .str.replace(",", ".", regex=False)
-            .str.extract(r"(\d+\.?\d*)")[0]
-        )
-        df_log["Surface"] = pd.to_numeric(df_log["Surface"], errors="coerce")
-
         col1, col2, col3 = st.columns(3)
 
         with col1:
@@ -256,7 +248,8 @@ with t0:
             immeuble_sel = st.selectbox("Adresse / Immeuble", immeubles)
 
         with col3:
-            surface_min = st.number_input("Surface minimum", min_value=0, value=20)
+            types_objet = ["Tous"] + sorted(df_log["Type objet"].dropna().astype(str).unique().tolist())
+            type_objet_sel = st.selectbox("Type d'objet", types_objet)
 
         df_filtre = df_log.copy()
 
@@ -266,10 +259,10 @@ with t0:
         if immeuble_sel != "Tous":
             df_filtre = df_filtre[df_filtre["Adresse"].astype(str) == immeuble_sel]
 
-        if surface_min > 0:
-            df_filtre = df_filtre[df_filtre["Surface"] >= surface_min]
+        if type_objet_sel != "Tous":
+            df_filtre = df_filtre[df_filtre["Type objet"].astype(str) == type_objet_sel]
 
-        st.write(f"Logements trouvés : {len(df_filtre)}")
+        st.metric("Logements trouvés", len(df_filtre))
         st.dataframe(df_filtre, use_container_width=True)
 
     else:
