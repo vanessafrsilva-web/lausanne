@@ -169,7 +169,7 @@ div[data-testid="stAppViewContainer"] .stButton > button {
 
 /* hover */
 div[data-testid="stAppViewContainer"] .stButton > button:hover {
-    background-color: #f3f6fb !important;
+    background-color: #38761d !important;
     color: #073763 !important;
 }
 
