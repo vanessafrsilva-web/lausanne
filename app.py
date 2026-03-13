@@ -289,7 +289,6 @@ with t0:
     else:
         st.info("Aucune liste de logements chargée.")
 
-reset_recherche_ia():
 # --- ONGLET IA ---
 with t_ai:
     st.subheader("🤖 Recherche intelligente de logements")
