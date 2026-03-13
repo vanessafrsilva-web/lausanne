@@ -162,12 +162,47 @@ with st.sidebar:
 
 # --- ONGLET LOGEMENTS ---
 with t0:
+
     st.subheader("🏠 Logements disponibles")
 
     if not st.session_state.logements.empty:
+
         df_log = st.session_state.logements.copy()
-        st.dataframe(df_log, use_container_width=True)
+
+        col1, col2, col3 = st.columns(3)
+
+        # filtre ville
+        with col1:
+            villes = ["Toutes"] + sorted(df_log["Ville"].dropna().unique().tolist())
+            ville_sel = st.selectbox("Ville", villes)
+
+        # filtre immeuble
+        with col2:
+            immeubles = ["Tous"] + sorted(df_log["Adresse"].dropna().unique().tolist())
+            immeuble_sel = st.selectbox("Adresse / Immeuble", immeubles)
+
+        # filtre surface
+        with col3:
+            surface_min = st.number_input("Surface minimum", value=0)
+
+        # application filtres
+        df_filtre = df_log.copy()
+
+        if ville_sel != "Toutes":
+            df_filtre = df_filtre[df_filtre["Ville"] == ville_sel]
+
+        if immeuble_sel != "Tous":
+            df_filtre = df_filtre[df_filtre["Adresse"] == immeuble_sel]
+
+        if surface_min > 0:
+            df_filtre = df_filtre[df_filtre["Surface"] >= surface_min]
+
+        st.write(f"Logements trouvés : {len(df_filtre)}")
+
+        st.dataframe(df_filtre, use_container_width=True)
+
     else:
+
         st.info("Aucune liste de logements chargée.")
 
 
