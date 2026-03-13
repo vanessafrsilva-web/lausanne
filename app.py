@@ -300,8 +300,6 @@ c1, c2 = st.columns(2)
 c1.metric("Logements trouvés", len(df_filtre))
 c2.metric("Immeubles distincts", df_filtre["Adresse"].nunique())
 
-        st.dataframe(df_filtre, use_container_width=True)
-
         # Indicateur détaillé par bâtiment
         if "Adresse" in df_filtre.columns:
             st.markdown("### 📊 Répartition par immeuble")
