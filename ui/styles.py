@@ -155,6 +155,24 @@ def appliquer_styles():
         color: #073763 !important;
     }
 
+/* ===============================
+   BOUTONS FORMULAIRE
+=============================== */
+
+div[data-testid="stAppViewContainer"] .stButton > button {
+    background-color: white !important;
+    color: #073763 !important;
+    border-radius: 8px !important;
+    border: 1px solid #dbe3f1 !important;
+    font-weight: 600;
+}
+
+/* hover */
+div[data-testid="stAppViewContainer"] .stButton > button:hover {
+    background-color: #f3f6fb !important;
+    color: #073763 !important;
+}
+
     /* ===============================
        DATAFRAME / TABLE
     =============================== */
