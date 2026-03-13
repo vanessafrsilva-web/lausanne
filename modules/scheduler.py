@@ -1,4 +1,4 @@
-
+from datetime import datetime, timedelta
 def calculer_creneau(agent, date_str, temp_db, batiment_cible, bloc_impose):
     m_jour = temp_db[(temp_db['Date'] == date_str) & (temp_db['Agent'] == agent)]
     h_start = "08:15" if bloc_impose == "Matin" else "13:00"
