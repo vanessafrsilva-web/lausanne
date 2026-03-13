@@ -31,7 +31,7 @@ st.set_page_config(
     layout="wide",
     page_icon="📍"
 )
-
+appliquer_styles()
 
 # --- FONCTIONS TECHNIQUES ---
 def trouver_secteur(batiment):
