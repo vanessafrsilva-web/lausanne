@@ -229,6 +229,7 @@ with t0:
             types_objet = ["Tous"] + sorted(df_log["Type objet"].dropna().astype(str).unique().tolist())
             type_objet_sel = st.selectbox("Type d'objet", types_objet)
 
+        
         df_filtre = df_log.copy()
 
         if ville_sel != "Toutes":
@@ -271,35 +272,34 @@ with t0:
         st.info("Aucune liste de logements chargée.")
 
 with t_ai:
-
     st.subheader("🤖 Recherche intelligente de logements")
 
     if not st.session_state.logements.empty:
-
         df_log = st.session_state.logements.copy()
 
         col1, col2 = st.columns(2)
 
         with col1:
             villes = ["Toutes"] + sorted(df_log["Ville"].dropna().astype(str).unique().tolist())
-            ville = st.selectbox("Ville souhaitée", villes)
+            ville = st.selectbox("Ville souhaitée", villes, key="ai_ville")
 
             type_objet = st.selectbox(
                 "Type d'objet",
-                ["Tous"] + sorted(df_log["Type objet"].dropna().astype(str).unique().tolist())
+                ["Tous"] + sorted(df_log["Type objet"].dropna().astype(str).unique().tolist()),
+                key="ai_type_objet"
             )
 
         with col2:
-            budget = st.number_input("Budget maximum", 0.0, 5000.0, 1500.0)
-            surface = st.number_input("Surface minimale", 0.0, 200.0, 20.0)
+            budget = st.number_input("Budget maximum", 0.0, 5000.0, 1500.0, key="ai_budget")
+            surface = st.number_input("Surface minimale", 0.0, 200.0, 20.0, key="ai_surface")
 
         demande = st.text_area(
             "Demande utilisateur",
-            placeholder="Ex: studio Lausanne max 1400 proche centre"
+            placeholder="Ex: studio Lausanne max 1400 proche centre",
+            key="ai_demande"
         )
 
-        if st.button("🔎 Chercher les meilleurs logements"):
-
+        if st.button("🔎 Chercher les meilleurs logements", key="ai_btn_recherche"):
             criteres = {
                 "ville": ville,
                 "type_objet": type_objet,
@@ -313,14 +313,18 @@ with t_ai:
             if resultats.empty:
                 st.warning("Aucun logement correspondant.")
             else:
-
                 st.success("Voici les meilleurs logements proposés :")
 
                 st.data_editor(
                     resultats,
                     use_container_width=True,
-                    disabled=True
+                    disabled=True,
+                    key="ai_resultats"
                 )
+    else:
+        st.info("Charge d'abord la liste des logements vacants dans la sidebar.")
+
+
 # --- ONGLET ATTRIBUTION ---
 with t_attrib:
     st.subheader("📝 Formulaire d'attribution")
