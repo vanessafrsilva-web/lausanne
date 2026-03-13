@@ -280,6 +280,7 @@ with t0:
 
 
 # --- ONGLET IA ---
+# --- ONGLET IA ---
 with t_ai:
     st.subheader("🤖 Recherche intelligente de logements")
 
@@ -326,32 +327,52 @@ with t_ai:
             key="ai_demande"
         )
 
-        if st.button("🔎 Chercher les meilleurs logements", key="ai_btn_recherche"):
-            criteres = {
-                "ville": ville,
-                "type_objet": type_objet,
-                "loyer_min": loyer_min,
-                "loyer_max": loyer_max,
-                "parking": parking,
-                "piquet": piquet,
-                "accompagne_2": accompagne_2,
-                "accompagne_plus_2": accompagne_plus_2,
-                "mot_cle": demande
-            }
+        colA, colB = st.columns(2)
 
-            resultats = recommander_logements(df_log, criteres, top_n=3)
+        with colA:
+            if st.button("🔎 Chercher les meilleurs logements", key="ai_btn_recherche"):
+                criteres = {
+                    "ville": ville,
+                    "type_objet": type_objet,
+                    "loyer_min": loyer_min,
+                    "loyer_max": loyer_max,
+                    "parking": parking,
+                    "piquet": piquet,
+                    "accompagne_2": accompagne_2,
+                    "accompagne_plus_2": accompagne_plus_2,
+                    "mot_cle": demande
+                }
 
-            if resultats.empty:
-                st.warning("Aucun logement correspondant.")
-            else:
-                st.success("Voici les meilleurs logements proposés :")
+                resultats = recommander_logements(df_log, criteres, top_n=3)
 
-                st.data_editor(
-                    resultats,
-                    use_container_width=True,
-                    disabled=True,
-                    key="ai_resultats"
-                )
+                if resultats.empty:
+                    st.warning("Aucun logement correspondant.")
+                else:
+                    st.success("Voici les meilleurs logements proposés :")
+                    st.data_editor(
+                        resultats,
+                        use_container_width=True,
+                        disabled=True,
+                        key="ai_resultats"
+                    )
+
+        with colB:
+            if st.button("♻️ Reset recherche", key="ai_reset"):
+                st.session_state.ai_ville = "Toutes"
+                st.session_state.ai_type_objet = "Tous"
+                st.session_state.ai_loyer_min = 0.0
+                st.session_state.ai_loyer_max = 700.0
+                st.session_state.ai_parking = "Non"
+                st.session_state.ai_piquet = "Non"
+                st.session_state.ai_accompagne_2 = "Non"
+                st.session_state.ai_accompagne_plus_2 = "Non"
+                st.session_state.ai_demande = ""
+
+                if "ai_resultats" in st.session_state:
+                    del st.session_state["ai_resultats"]
+
+                st.rerun()
+
     else:
         st.info("Charge d'abord la liste des logements vacants dans la sidebar.")
 
