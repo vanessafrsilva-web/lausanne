@@ -112,6 +112,7 @@ div[role="listbox"] {
 </style>
 """, unsafe_allow_html=True)
 
+
 # --- FONCTIONS TECHNIQUES ---
 def trouver_secteur(batiment):
     for secteur, liste in SECTEURS.items():
@@ -128,7 +129,6 @@ if "db" not in st.session_state:
 
 if "logements" not in st.session_state:
     st.session_state.logements = pd.DataFrame()
-
 
 if "attributions" not in st.session_state:
     st.session_state.attributions = pd.DataFrame(columns=[
@@ -148,6 +148,8 @@ if "attributions" not in st.session_state:
         "Salaire",
         "Ancien locataire"
     ])
+
+
 # --- INTERFACE ---
 st.title("📍 Unité Logement : 2.0")
 
@@ -161,9 +163,7 @@ t0, t_attrib, t1, t2, t3 = st.tabs([
 
 
 # --- SIDEBAR ---
-
 with st.sidebar:
-
     st.header("📂 Importation")
     st.caption("Formats acceptés : XLSX")
 
@@ -256,29 +256,29 @@ with st.sidebar:
         except Exception as e:
             st.error(f"Erreur missions : {e}")
 
-  if st.button("🗑️ Reset"):
-    st.session_state.db = pd.DataFrame(
-        columns=["ID", "Batiment", "Date", "Heure", "Agent", "Rue", "Type", "Statut", "Date_Sort"]
-    )
-    st.session_state.logements = pd.DataFrame()
-    st.session_state.attributions = pd.DataFrame(columns=[
-        "Nom",
-        "Prénom",
-        "Sexe",
-        "Fonction",
-        "Bâtiment",
-        "Studio",
-        "Type objet",
-        "Prix logement",
-        "Nom 2ème personne",
-        "Parc",
-        "Type parc",
-        "Prix parc",
-        "Facture",
-        "Salaire",
-        "Ancien locataire"
-    ])
-    st.rerun()
+    if st.button("🗑️ Reset"):
+        st.session_state.db = pd.DataFrame(
+            columns=["ID", "Batiment", "Date", "Heure", "Agent", "Rue", "Type", "Statut", "Date_Sort"]
+        )
+        st.session_state.logements = pd.DataFrame()
+        st.session_state.attributions = pd.DataFrame(columns=[
+            "Nom",
+            "Prénom",
+            "Sexe",
+            "Fonction",
+            "Bâtiment",
+            "Studio",
+            "Type objet",
+            "Prix logement",
+            "Nom 2ème personne",
+            "Parc",
+            "Type parc",
+            "Prix parc",
+            "Facture",
+            "Salaire",
+            "Ancien locataire"
+        ])
+        st.rerun()
 
 
 # --- ONGLET LOGEMENTS ---
@@ -288,7 +288,6 @@ with t0:
     if not st.session_state.logements.empty:
         df_log = st.session_state.logements.copy()
 
-        # Recherche rapide
         recherche = st.text_input(
             "🔎 Recherche rapide",
             placeholder="Ex: Lausanne, Montolieu, N° Studio..."
@@ -350,44 +349,7 @@ with t0:
         st.info("Aucune liste de logements chargée.")
 
 
-# Indicateurs
-if not st.session_state.logements.empty:
-    df_log = st.session_state.logements.copy()
-
-    # filtres
-    df_filtre = df_log.copy()
-
-    if ville_sel != "Toutes":
-        df_filtre = df_filtre[df_filtre["Ville"].astype(str) == ville_sel]
-
-    if immeuble_sel != "Tous":
-        df_filtre = df_filtre[df_filtre["Adresse"].astype(str) == immeuble_sel]
-
-    if type_objet_sel != "Tous":
-        df_filtre = df_filtre[df_filtre["Type objet"].astype(str) == type_objet_sel]
-
-    # INDICATEURS
-    c1, c2 = st.columns(2)
-    c1.metric("Logements trouvés", len(df_filtre))
-    c2.metric("Immeubles distincts", df_filtre["Adresse"].nunique())
-
-    # TABLEAU
-    st.dataframe(df_filtre, use_container_width=True)
-
-    # REPARTITION
-    if "Adresse" in df_filtre.columns:
-        st.markdown("### 📊 Répartition par immeuble")
-        repartition = (
-            df_filtre["Adresse"]
-            .value_counts()
-            .reset_index()
-        )
-        repartition.columns = ["Adresse", "Nombre de logements"]
-        st.dataframe(repartition, use_container_width=True)
-
-else:
-    st.info("Aucune liste de logements chargée.")
-    
+# --- ONGLET ATTRIBUTION ---
 with t_attrib:
     st.subheader("📝 Formulaire d'attribution")
 
@@ -409,26 +371,26 @@ with t_attrib:
         col1, col2 = st.columns(2)
 
         with col1:
-            nom = st.text_input("Nom")
-            prenom = st.text_input("Prénom")
-            sexe = st.radio("Sexe", ["Masculin", "Féminin"])
+            nom = st.text_input("Nom", key="attrib_nom")
+            prenom = st.text_input("Prénom", key="attrib_prenom")
+            sexe = st.radio("Sexe", ["Masculin", "Féminin"], key="attrib_sexe")
 
         with col2:
-            fonction = st.text_input("Fonction")
-            nom_2eme = st.text_input("Nom pour la 2ème personne")
-            ancien_locataire = st.text_input("Nom de l'ancien locataire")
+            fonction = st.text_input("Fonction", key="attrib_fonction")
+            nom_2eme = st.text_input("Nom pour la 2ème personne", key="attrib_nom2")
+            ancien_locataire = st.text_input("Nom de l'ancien locataire", key="attrib_ancien")
 
         st.markdown("### 🚗 Place de parc et administratif")
         col3, col4 = st.columns(2)
 
         with col3:
-            parc = st.text_input("Parc #")
-            type_parc = st.radio("Type de parc", ["Intérieur", "Extérieur"])
-            prix_parc = st.number_input("Prix parc", min_value=0.0, value=0.0)
+            parc = st.text_input("Parc #", key="attrib_parc")
+            type_parc = st.radio("Type de parc", ["Intérieur", "Extérieur"], key="attrib_type_parc")
+            prix_parc = st.number_input("Prix parc", min_value=0.0, value=0.0, key="attrib_prix_parc")
 
         with col4:
-            facture = st.text_input("Facture")
-            salaire = st.text_input("Salaire")
+            facture = st.text_input("Facture", key="attrib_facture")
+            salaire = st.text_input("Salaire", key="attrib_salaire")
 
         if st.button("✅ Valider l'attribution"):
             nouvelle_attribution = pd.DataFrame([{
@@ -461,9 +423,11 @@ with t_attrib:
 
     else:
         st.warning("Charge d'abord la liste des logements vacants dans la sidebar.")
+
+
+# --- ONGLETS PLANNING / RAPPORTS ---
 if not st.session_state.db.empty:
 
-    
     with t1:
         df_v = st.session_state.db.sort_values(["Date_Sort", "Heure"])
 
