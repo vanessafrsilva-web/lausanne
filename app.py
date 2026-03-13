@@ -111,17 +111,23 @@ t0, t1, t2, t3 = st.tabs([
 with st.sidebar:
     st.header("📂 Importation")
 
-up = st.file_uploader(
-    "📂 Déposer ou sélectionner le fichier des missions",
-    type=["xlsx"],
-    key="upload_missions"
-)
+with st.sidebar:
 
-up_logements = st.file_uploader(
-    "🏠 Déposer ou sélectionner la liste des appartements vacants",
-    type=["csv", "xlsx"],
-    key="upload_logements"
-)
+    st.header("📂 Importation")
+
+    up = st.file_uploader(
+        "📂 Déposer le fichier des missions",
+        type=["xlsx"],
+        key="upload_missions"
+    )
+
+    st.subheader("Logements vacants")
+
+    up_logements = st.file_uploader(
+        "🏠 Déposer la liste des appartements vacants",
+        type=["csv", "xlsx"],
+        key="upload_logements"
+    )
 
     if up_logements and st.button("🏠 Charger les logements"):
         try:
