@@ -31,7 +31,7 @@ if 'db' not in st.session_state:
 
 # --- INTERFACE ---
 st.title("📍 Unité Logement : Planning & Rapports")
-t1, t2, t3 = st.tabs(["📝 Planning Global", "📅 Vue par Agent", "📊 Rapports & Analyses"])
+t0, t1, t2, t3 = st.tabs(["📝 Planning Global", "📅 Vue par Agent", "📊 Rapports & Analyses"])
 
 with st.sidebar:
     st.header("📂 Importation")
