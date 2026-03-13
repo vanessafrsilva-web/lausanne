@@ -1,4 +1,4 @@
-
+from datetime import datetime, timedelta
 def generer_ics(df_agent):
     ics_content = "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Unite Logement//Planning//FR\n"
     for _, row in df_agent.iterrows():
