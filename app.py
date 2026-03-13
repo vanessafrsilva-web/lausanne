@@ -42,7 +42,7 @@ section[data-testid="stSidebar"] {
 
 /* TEXTE SIDEBAR BLEU */
 section[data-testid="stSidebar"] * {
-    color: #073763;
+    color: #ffffff;
 }
 
 /* uploaders sidebar */
