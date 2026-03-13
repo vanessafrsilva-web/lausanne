@@ -34,60 +34,32 @@ st.set_page_config(
 st.markdown("""
 <style>
 
-/* Sidebar */
+/* Sidebar blanche */
 section[data-testid="stSidebar"] {
-    background-color: #102a43;
+    background-color: #ffffff;
 }
 
 section[data-testid="stSidebar"] * {
-    color: white;
+    color: #102a43;
 }
 
-/* Carte uploader extérieure */
+/* uploader sidebar */
 section[data-testid="stSidebar"] [data-testid="stFileUploader"] {
-    background-color: #173a5e !important;
-    border: 1px solid #2E6BF6 !important;
-    border-radius: 14px !important;
-    padding: 14px !important;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+    border: 1px solid #dbe3f1;
+    border-radius: 10px;
+    padding: 12px;
 }
 
-/* Zone blanche interne */
-section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] {
-    background-color: #f7f9fc !important;
-    border: none !important;
-    border-radius: 10px !important;
-    padding: 22px !important;
-}
-
-/* Texte dans la zone blanche */
-section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] * {
-    color: #102a43 !important;
-}
-
-/* Bouton browse */
-section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] button {
-    background-color: #2E6BF6 !important;
-    color: white !important;
-    border: none !important;
-    border-radius: 8px !important;
-    font-weight: 600 !important;
-}
-
-section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] button:hover {
-    background-color: #1c4ed8 !important;
-}
-
-/* Boutons classiques */
+/* bouton */
 section[data-testid="stSidebar"] .stButton > button {
-    background-color: #2E6BF6 !important;
-    color: white !important;
-    border: none !important;
-    border-radius: 8px !important;
+    background-color: #2E6BF6;
+    color: white;
+    border-radius: 8px;
+    border: none;
 }
 
 section[data-testid="stSidebar"] .stButton > button:hover {
-    background-color: #1c4ed8 !important;
+    background-color: #1c4ed8;
 }
 
 </style>
