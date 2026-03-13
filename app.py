@@ -10,6 +10,10 @@ from modules.distance import calculer_distance
 from modules.calendar import generer_ics
 from modules.scheduler import calculer_creneau
 
+@st.cache_data
+def charger_excel(file):
+    return pd.read_excel(file)
+
 
 st.set_page_config(page_title="Unité Logement - Gestion Planning", layout="wide", page_icon="📍")
 
