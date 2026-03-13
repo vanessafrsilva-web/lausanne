@@ -176,6 +176,9 @@ div[role="listbox"] {
 [data-testid="stDataFrame"] .gdg-row:hover {
     background-color: #eef4ff !important;
 }
+[data-testid="stDataFrame"] {
+    box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+}
 
 </style>
 """, unsafe_allow_html=True)
