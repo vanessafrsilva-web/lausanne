@@ -363,31 +363,32 @@ loyer_max = st.number_input(
             key="ai_demande"
         )
 
-        colA, colB = st.columns(2)
+colA, colB = st.columns(2)
 
-        with colA:
-            if st.button("🔎 Chercher les meilleurs logements", key="ai_btn_recherche"):
-                criteres = {
-                    "ville": ville,
-                    "type_objet": type_objet,
-                    "loyer_min": loyer_min,
-                    "loyer_max": loyer_max,
-                    "parking": parking,
-                    "piquet": piquet,
-                    "accompagne_2": accompagne_2,
-                    "accompagne_plus_2": accompagne_plus_2,
-                    "mot_cle": demande
-                }
+with colA:
+    if st.button("🔎 Chercher les meilleurs logements", key="ai_btn_recherche"):
 
-                resultats = recommander_logements(df_log, criteres, top_n=3)
-                st.session_state["ai_resultats_df"] = resultats.copy()
+        criteres = {
+            "ville": ville,
+            "type_objet": type_objet,
+            "loyer_min": loyer_min,
+            "loyer_max": loyer_max,
+            "parking": parking,
+            "piquet": piquet,
+            "accompagne_2": accompagne_2,
+            "accompagne_plus_2": accompagne_plus_2,
+            "mot_cle": demande
+        }
 
-        with colB:
-            st.button(
-                "♻️ Reset recherche",
-                key="ai_reset",
-                on_click=reset_recherche_ia
-            )
+        resultats = recommander_logements(df_log, criteres, top_n=3)
+        st.session_state["ai_resultats_df"] = resultats.copy()
+
+with colB:
+    st.button(
+        "♻️ Reset recherche",
+        key="ai_reset",
+        on_click=reset_recherche_ia
+    )
 
         if "ai_resultats_df" in st.session_state:
             if st.session_state["ai_resultats_df"].empty:
