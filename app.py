@@ -31,12 +31,15 @@ st.set_page_config(
 )
 
 #--Visuelle CSS
+# --- CSS visuel ---
 st.markdown("""
 <style>
+
 /* Sidebar */
 section[data-testid="stSidebar"] {
     background-color: #102a43;
 }
+
 section[data-testid="stSidebar"] * {
     color: white;
 }
@@ -49,20 +52,31 @@ section[data-testid="stSidebar"] .stFileUploader {
     border: 1px solid #2E6BF6;
 }
 
-/* Cache le bouton natif illisible */
+/* Zone interne upload */
+section[data-testid="stSidebar"] .stFileUploader > div {
+    background-color: #1f3b63 !important;
+    border-radius: 10px !important;
+}
+
+/* Zone drag & drop */
+section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] {
+    background-color: #1f3b63 !important;
+}
+
+/* Texte uploader */
+section[data-testid="stSidebar"] .stFileUploader label,
+section[data-testid="stSidebar"] .stFileUploader span,
+section[data-testid="stSidebar"] .stFileUploader small {
+    color: white !important;
+}
+
+/* Cache le bouton "Browse files" */
 section[data-testid="stSidebar"] .stFileUploader button {
     opacity: 0 !important;
     height: 0 !important;
     padding: 0 !important;
     margin: 0 !important;
     border: none !important;
-}
-
-/* Rend le texte de la zone visible */
-section[data-testid="stSidebar"] .stFileUploader small,
-section[data-testid="stSidebar"] .stFileUploader span,
-section[data-testid="stSidebar"] .stFileUploader div {
-    color: white !important;
 }
 
 /* Boutons sidebar */
@@ -72,9 +86,11 @@ section[data-testid="stSidebar"] .stButton > button {
     border-radius: 8px !important;
     border: none !important;
 }
+
 section[data-testid="stSidebar"] .stButton > button:hover {
     background-color: #1c4ed8 !important;
 }
+
 </style>
 """, unsafe_allow_html=True)
 
