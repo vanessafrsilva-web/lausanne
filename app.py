@@ -134,7 +134,7 @@ if "attributions" not in st.session_state:
         "Ancien locataire"
     ])
 
-
+charger_data_sauvegardee()
 # --- INTERFACE ---
 st.title("📍 Unité Logement : 2.0")
 
