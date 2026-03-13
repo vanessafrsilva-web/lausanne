@@ -24,7 +24,7 @@ def appliquer_styles():
 
     /* Fond principal */
     [data-testid="stAppViewContainer"] {
-        background-color: #073763;
+        background-color: white;
     }
 
     /* Table */
