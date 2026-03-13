@@ -256,12 +256,29 @@ with st.sidebar:
         except Exception as e:
             st.error(f"Erreur missions : {e}")
 
-    if st.button("🗑️ Reset"):
-        st.session_state.db = pd.DataFrame(
-            columns=["ID", "Batiment", "Date", "Heure", "Agent", "Rue", "Type", "Statut", "Date_Sort"]
-        )
-        st.session_state.logements = pd.DataFrame()
-        st.rerun()
+  if st.button("🗑️ Reset"):
+    st.session_state.db = pd.DataFrame(
+        columns=["ID", "Batiment", "Date", "Heure", "Agent", "Rue", "Type", "Statut", "Date_Sort"]
+    )
+    st.session_state.logements = pd.DataFrame()
+    st.session_state.attributions = pd.DataFrame(columns=[
+        "Nom",
+        "Prénom",
+        "Sexe",
+        "Fonction",
+        "Bâtiment",
+        "Studio",
+        "Type objet",
+        "Prix logement",
+        "Nom 2ème personne",
+        "Parc",
+        "Type parc",
+        "Prix parc",
+        "Facture",
+        "Salaire",
+        "Ancien locataire"
+    ])
+    st.rerun()
 
 
 # --- ONGLET LOGEMENTS ---
@@ -302,7 +319,6 @@ with t0:
         if type_objet_sel != "Tous":
             df_filtre = df_filtre[df_filtre["Type objet"].astype(str) == type_objet_sel]
 
-        # Recherche rapide sur plusieurs colonnes
         if recherche:
             recherche = recherche.lower()
             colonnes_recherche = ["Ville", "Adresse", "Type objet", "Référence interne", "Numéro unique"]
@@ -313,6 +329,25 @@ with t0:
                     masque = masque | df_filtre[col].astype(str).str.lower().str.contains(recherche, na=False)
 
             df_filtre = df_filtre[masque]
+
+        c1, c2 = st.columns(2)
+        c1.metric("Logements trouvés", len(df_filtre))
+        c2.metric("Immeubles distincts", df_filtre["Adresse"].nunique())
+
+        st.dataframe(df_filtre, use_container_width=True)
+
+        if "Adresse" in df_filtre.columns:
+            st.markdown("### 📊 Répartition par immeuble")
+            repartition = (
+                df_filtre["Adresse"]
+                .value_counts()
+                .reset_index()
+            )
+            repartition.columns = ["Adresse", "Nombre de logements"]
+            st.dataframe(repartition, use_container_width=True)
+
+    else:
+        st.info("Aucune liste de logements chargée.")
 
 
 # Indicateurs
@@ -369,10 +404,8 @@ with t_attrib:
         st.write("**Ville :**", logement_info.get("Ville", ""))
         st.write("**Type objet :**", logement_info.get("Type objet", ""))
         st.write("**Surface :**", logement_info.get("Surface", ""))
-    else:
-        st.warning("Charge d'abord la liste des logements vacants dans la sidebar.")
-        st.markdown("### 👤 Informations du locataire")
 
+        st.markdown("### 👤 Informations du locataire")
         col1, col2 = st.columns(2)
 
         with col1:
@@ -384,8 +417,8 @@ with t_attrib:
             fonction = st.text_input("Fonction")
             nom_2eme = st.text_input("Nom pour la 2ème personne")
             ancien_locataire = st.text_input("Nom de l'ancien locataire")
-                    st.markdown("### 🚗 Place de parc et administratif")
 
+        st.markdown("### 🚗 Place de parc et administratif")
         col3, col4 = st.columns(2)
 
         with col3:
@@ -422,18 +455,15 @@ with t_attrib:
             )
 
             st.success("Attribution enregistrée avec succès.")
-                    st.markdown("### 📋 Attributions enregistrées")
+
+        st.markdown("### 📋 Attributions enregistrées")
         st.dataframe(st.session_state.attributions, use_container_width=True)
-with t_attrib:
-    st.subheader("📝 Formulaire d'attribution")
 
-    if not st.session_state.logements.empty:
-        st.info("Choisis d'abord un logement, puis remplis les informations du locataire.")
     else:
-        st.warning("Charge d'abord la liste des logements vacants dans l'onglet sidebar.")
-        
-        if not st.session_state.db.empty:
+        st.warning("Charge d'abord la liste des logements vacants dans la sidebar.")
+if not st.session_state.db.empty:
 
+    
     with t1:
         df_v = st.session_state.db.sort_values(["Date_Sort", "Heure"])
 
