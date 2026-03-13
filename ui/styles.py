@@ -15,7 +15,7 @@ def appliquer_styles():
         background-color: #073763;
         color: white;
         border-radius: 8px;
-        border: none;
+        border: white;
     }
 
     section[data-testid="stSidebar"] .stButton > button:hover {
